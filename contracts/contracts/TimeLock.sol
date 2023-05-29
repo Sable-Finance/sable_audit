@@ -105,7 +105,7 @@ contract TimeLock is AccessControl {
     }
 
     /**
-     * @dev Contract might receive/hold ETH as part of the maintenance process.
+     * @dev Contract might receive/hold BNB as part of the maintenance process.
      */
     receive() external payable {}
 

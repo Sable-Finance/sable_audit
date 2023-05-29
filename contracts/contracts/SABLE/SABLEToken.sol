@@ -4,7 +4,7 @@ pragma solidity 0.6.11;
 
 import "../Dependencies/CheckContract.sol";
 import "../Dependencies/SafeMath.sol";
-import "../Interfaces/ILQTYToken.sol";
+import "../Interfaces/ISABLEToken.sol";
 import "../Dependencies/console.sol";
 
 /*
@@ -15,13 +15,13 @@ import "../Dependencies/console.sol";
 * https://github.com/OpenZeppelin/openzeppelin-contracts/blob/53516bc555a454862470e7860a9b5254db4d00f5/contracts/token/ERC20/ERC20Permit.sol
 * 
 *
-*  --- Functionality added specific to the LQTYToken ---
+*  --- Functionality added specific to the SABLEToken ---
 * 
 * 1) Transfer protection: blacklist of addresses that are invalid recipients (i.e. core Liquity contracts) in external 
-* transfer() and transferFrom() calls. The purpose is to protect users from losing tokens by mistakenly sending LQTY directly to a Liquity
+* transfer() and transferFrom() calls. The purpose is to protect users from losing tokens by mistakenly sending SABLE directly to a Liquity
 * core contract, when they should rather call the right function.
 *
-* 2) sendToLQTYStaking(): callable only by Liquity core contracts, which move LQTY tokens from user -> LQTYStaking contract.
+* 2) sendToSABLEStaking(): callable only by Liquity core contracts, which move SABLE tokens from user -> SABLEStaking contract.
 *
 * 3) Supply hard-capped at 100 million
 *
@@ -40,19 +40,19 @@ import "../Dependencies/console.sol";
 *  LockupContractFactory 
 * -approve(), increaseAllowance(), decreaseAllowance() revert when called by the multisig
 * -transferFrom() reverts when the multisig is the sender
-* -sendToLQTYStaking() reverts when the multisig is the sender, blocking the multisig from staking its LQTY.
+* -sendToSABLEStaking() reverts when the multisig is the sender, blocking the multisig from staking its SABLE.
 * 
-* After one year has passed since deployment of the LQTYToken, the restrictions on multisig operations are lifted
+* After one year has passed since deployment of the SABLEToken, the restrictions on multisig operations are lifted
 * and the multisig has the same rights as any other address.
 */
 
-contract LQTYToken is CheckContract, ILQTYToken {
+contract SABLEToken is CheckContract, ISABLEToken {
     using SafeMath for uint256;
 
     // --- ERC20 Data ---
 
-    string internal constant _NAME = "LQTY";
-    string internal constant _SYMBOL = "LQTY";
+    string internal constant _NAME = "SABLE";
+    string internal constant _SYMBOL = "SABLE";
     string internal constant _VERSION = "1";
     uint8 internal constant _DECIMALS = 18;
 
@@ -79,24 +79,24 @@ contract LQTYToken is CheckContract, ILQTYToken {
 
     mapping(address => uint256) private _nonces;
 
-    // --- LQTYToken specific data ---
+    // --- SABLEToken specific data ---
 
     uint internal immutable deploymentStartTime;
 
-    address public immutable lqtyStakingAddress;
+    address public immutable sableStakingAddress;
 
     // --- Events ---
 
-    event LQTYStakingAddressSet(address _lqtyStakingAddress);
+    event SABLEStakingAddressSet(address _sableStakingAddress);
 
     // --- Functions ---
 
-    constructor(address _lqtyStakingAddress, address _vaultAddress, uint256 _mintAmount) public {
-        checkContract(_lqtyStakingAddress);
+    constructor(address _sableStakingAddress, address _vaultAddress, uint256 _mintAmount) public {
+        checkContract(_sableStakingAddress);
 
         deploymentStartTime = block.timestamp;
 
-        lqtyStakingAddress = _lqtyStakingAddress;
+        sableStakingAddress = _sableStakingAddress;
 
         bytes32 hashedName = keccak256(bytes(_NAME));
         bytes32 hashedVersion = keccak256(bytes(_VERSION));
@@ -106,7 +106,7 @@ contract LQTYToken is CheckContract, ILQTYToken {
         _CACHED_CHAIN_ID = _chainID();
         _CACHED_DOMAIN_SEPARATOR = _buildDomainSeparator(_TYPE_HASH, hashedName, hashedVersion);
 
-        // --- Initial LQTY allocations ---
+        // --- Initial SABLE allocations ---
 
         _mint(_vaultAddress, _mintAmount);
 
@@ -187,9 +187,9 @@ contract LQTYToken is CheckContract, ILQTYToken {
         return true;
     }
 
-    function sendToLQTYStaking(address _sender, uint256 _amount) external override {
-        _requireCallerIsLQTYStaking();
-        _transfer(_sender, lqtyStakingAddress, _amount);
+    function sendToSABLEStaking(address _sender, uint256 _amount) external override {
+        _requireCallerIsSABLEStaking();
+        _transfer(_sender, sableStakingAddress, _amount);
     }
 
     // --- EIP 2612 functionality ---
@@ -211,7 +211,7 @@ contract LQTYToken is CheckContract, ILQTYToken {
         bytes32 r,
         bytes32 s
     ) external override {
-        require(deadline >= now, "LQTY: expired deadline");
+        require(deadline >= now, "SABLE: expired deadline");
         bytes32 digest = keccak256(
             abi.encodePacked(
                 "\x19\x01",
@@ -222,7 +222,7 @@ contract LQTYToken is CheckContract, ILQTYToken {
             )
         );
         address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress == owner, "LQTY: invalid signature");
+        require(recoveredAddress == owner, "SABLE: invalid signature");
         _approve(owner, spender, amount);
     }
 
@@ -279,19 +279,19 @@ contract LQTYToken is CheckContract, ILQTYToken {
     function _requireValidRecipient(address _recipient) internal view {
         require(
             _recipient != address(0) && _recipient != address(this),
-            "LQTY: Cannot transfer tokens directly to the LQTY token contract or the zero address"
+            "SABLE: Cannot transfer tokens directly to the SABLE token contract or the zero address"
         );
         require(
-            _recipient != lqtyStakingAddress,
-            "LQTY: Cannot transfer tokens directly to the community issuance or staking contract"
+            _recipient != sableStakingAddress,
+            "SABLE: Cannot transfer tokens directly to the community issuance or staking contract"
         );
     }
 
 
-    function _requireCallerIsLQTYStaking() internal view {
+    function _requireCallerIsSABLEStaking() internal view {
         require(
-            msg.sender == lqtyStakingAddress,
-            "LQTYToken: caller must be the LQTYStaking contract"
+            msg.sender == sableStakingAddress,
+            "SABLEToken: caller must be the SABLEStaking contract"
         );
     }
 

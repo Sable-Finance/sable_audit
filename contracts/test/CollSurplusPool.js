@@ -12,7 +12,7 @@ const DEFAULT_ORACLE_RATE = testHelpers.DEFAULT_ORACLE_RATE
 const DEFAULT_PRICE_FEED_DATA = testHelpers.DEFAULT_PRICE_FEED_DATA
 
 const TroveManagerTester = artifacts.require("TroveManagerTester")
-const LUSDToken = artifacts.require("LUSDToken")
+const USDSToken = artifacts.require("USDSToken")
 
 contract('CollSurplusPool', async accounts => {
   const [
@@ -27,49 +27,49 @@ contract('CollSurplusPool', async accounts => {
 
   let contracts
 
-  const getOpenTroveLUSDAmount = async (totalDebt) => th.getOpenTroveLUSDAmount(contracts, totalDebt)
+  const getOpenTroveUSDSAmount = async (totalDebt) => th.getOpenTroveUSDSAmount(contracts, totalDebt)
   const openTrove = async (params) => th.openTrove(contracts, params)
 
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.troveManager = await TroveManagerTester.new()
-    contracts.lusdToken = await LUSDToken.new(
+    contracts.usdsToken = await USDSToken.new(
       contracts.troveManager.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
     )
-    const LQTYContracts = await deploymentHelper.deployLQTYContracts(bountyAddress, lpRewardsAddress, multisig)
+    const SABLEContracts = await deploymentHelper.deploySABLEContracts(bountyAddress, lpRewardsAddress, multisig)
 
     priceFeed = contracts.priceFeedTestnet
     collSurplusPool = contracts.collSurplusPool
     borrowerOperations = contracts.borrowerOperations
 
-    await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
+    await deploymentHelper.connectCoreContracts(contracts, SABLEContracts)
     
-    await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
+    await deploymentHelper.connectSABLEContractsToCore(SABLEContracts, contracts)
 
     // funding PriceFeed contract
     await web3.eth.sendTransaction({from: funder, to: priceFeed.address, value: 1000000000})
   })
 
-  it("CollSurplusPool::getETH(): Returns the ETH balance of the CollSurplusPool after redemption", async () => {
-    const ETH_1 = await collSurplusPool.getETH()
-    assert.equal(ETH_1, '0')
+  it("CollSurplusPool::getBNB(): Returns the BNB balance of the CollSurplusPool after redemption", async () => {
+    const BNB_1 = await collSurplusPool.getBNB()
+    assert.equal(BNB_1, '0')
 
     const price = toBN(dec(100, 18))
     await priceFeed.setPrice(price)
 
     const { collateral: B_coll, netDebt: B_netDebt } = await openTrove({ ICR: toBN(dec(200, 16)), extraParams: { from: B } })
-    await openTrove({ extraLUSDAmount: B_netDebt, extraParams: { from: A, value: dec(3000, 'ether') } })
+    await openTrove({ extraUSDSAmount: B_netDebt, extraParams: { from: A, value: dec(3000, 'ether') } })
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
-    // At ETH:USD = 100, this redemption should leave 1 ether of coll surplus
+    // At BNB:USD = 100, this redemption should leave 1 ether of coll surplus
     await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt)
 
-    const ETH_2 = await collSurplusPool.getETH()
-    // th.assertIsApproximatelyEqual(ETH_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
+    const BNB_2 = await collSurplusPool.getBNB()
+    // th.assertIsApproximatelyEqual(BNB_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
   })
 
   it("CollSurplusPool: claimColl(): Reverts if caller is not Borrower Operations", async () => {
@@ -80,7 +80,7 @@ contract('CollSurplusPool', async accounts => {
     await th.assertRevert(borrowerOperations.claimCollateral({ from: A }), 'CollSurplusPool: No collateral available to claim')
   })
 
-  it.skip("CollSurplusPool: claimColl(): Reverts if owner cannot receive ETH surplus", async () => {
+  it.skip("CollSurplusPool: claimColl(): Reverts if owner cannot receive BNB surplus", async () => {
     const nonPayable = await NonPayable.new()
 
     const price = toBN(dec(100, 18))
@@ -88,29 +88,29 @@ contract('CollSurplusPool', async accounts => {
 
     // open trove from NonPayable proxy contract
     const B_coll = toBN(dec(60, 18))
-    const B_lusdAmount = toBN(dec(3000, 18))
-    const B_netDebt = await th.getAmountWithBorrowingFee(contracts, B_lusdAmount, DEFAULT_ORACLE_RATE)
-    // const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address,bytes[])', ['0xde0b6b3a7640000', web3.utils.toHex(B_lusdAmount), B, B, DEFAULT_PRICE_FEED_DATA])
-    // const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address)', ['0xde0b6b3a7640000', web3.utils.toHex(B_lusdAmount), B, B])
+    const B_usdsAmount = toBN(dec(3000, 18))
+    const B_netDebt = await th.getAmountWithBorrowingFee(contracts, B_usdsAmount, DEFAULT_ORACLE_RATE)
+    // const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address,bytes[])', ['0xde0b6b3a7640000', web3.utils.toHex(B_usdsAmount), B, B, DEFAULT_PRICE_FEED_DATA])
+    // const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address)', ['0xde0b6b3a7640000', web3.utils.toHex(B_usdsAmount), B, B])
     const signature = web3.utils.toHex('openTrove(uint256,uint256,address,address)')
-    const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address)', [signature, web3.utils.toHex(B_lusdAmount), B, B, DEFAULT_PRICE_FEED_DATA])
+    const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address)', [signature, web3.utils.toHex(B_usdsAmount), B, B, DEFAULT_PRICE_FEED_DATA])
     await nonPayable.forward(borrowerOperations.address, openTroveData, { value: B_coll })
-    await openTrove({ extraLUSDAmount: B_netDebt, extraParams: { from: A, value: dec(3000, 'ether') } })
+    await openTrove({ extraUSDSAmount: B_netDebt, extraParams: { from: A, value: dec(3000, 'ether') } })
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
-    // At ETH:USD = 100, this redemption should leave 1 ether of coll surplus for B
+    // At BNB:USD = 100, this redemption should leave 1 ether of coll surplus for B
     await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt)
 
-    const ETH_2 = await collSurplusPool.getETH()
-    th.assertIsApproximatelyEqual(ETH_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
+    const BNB_2 = await collSurplusPool.getBNB()
+    th.assertIsApproximatelyEqual(BNB_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
 
     const claimCollateralData = th.getTransactionData('claimCollateral()', [])
-    await th.assertRevert(nonPayable.forward(borrowerOperations.address, claimCollateralData), 'CollSurplusPool: sending ETH failed')
+    await th.assertRevert(nonPayable.forward(borrowerOperations.address, claimCollateralData), 'CollSurplusPool: sending BNB failed')
   })
 
-  it('CollSurplusPool: reverts trying to send ETH to it', async () => {
+  it('CollSurplusPool: reverts trying to send BNB to it', async () => {
     await th.assertRevert(web3.eth.sendTransaction({ from: A, to: collSurplusPool.address, value: 1 }), 'CollSurplusPool: Caller is not Active Pool')
   })
 

@@ -18,7 +18,7 @@ contract TroveManagerScript is CheckContract {
     }
 
     function redeemCollateral(
-        uint _LUSDAmount,
+        uint _USDSAmount,
         address _firstRedemptionHint,
         address _upperPartialRedemptionHint,
         address _lowerPartialRedemptionHint,
@@ -28,7 +28,7 @@ contract TroveManagerScript is CheckContract {
         bytes[] calldata priceFeedUpdateData
     ) external returns (uint) {
         troveManager.redeemCollateral(
-            _LUSDAmount,
+            _USDSAmount,
             _firstRedemptionHint,
             _upperPartialRedemptionHint,
             _lowerPartialRedemptionHint,

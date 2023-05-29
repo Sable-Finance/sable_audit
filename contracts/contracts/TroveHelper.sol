@@ -9,30 +9,30 @@ import "./Interfaces/ITroveHelper.sol";
 contract TroveHelper is LiquityBase, Ownable, CheckContract, ITroveHelper {
     TroveManager public troveManager;
     ISortedTroves public sortedTroves;
-    ILQTYToken public lqtyToken;
+    ISABLEToken public sableToken;
 
     function setAddresses(
         address _troveManagerAddress,
         address _systemStateAddress,
         address _sortedTrovesAddress,
-        address _lqtyTokenAddress,
+        address _sableTokenAddress,
         address _activePoolAddress,
         address _defaultPoolAddress
     ) external override onlyOwner {
         checkContract(_troveManagerAddress);
         checkContract(_systemStateAddress);
         checkContract(_sortedTrovesAddress);
-        checkContract(_lqtyTokenAddress);
+        checkContract(_sableTokenAddress);
         troveManager = TroveManager(_troveManagerAddress);
         systemState = ISystemState(_systemStateAddress);
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
-        lqtyToken = ILQTYToken(_lqtyTokenAddress);
+        sableToken = ISABLEToken(_sableTokenAddress);
         activePool = IActivePool(_activePoolAddress);
         defaultPool = IDefaultPool(_defaultPoolAddress);
     }
 
     /*
-     *  Get its offset coll/debt and ETH gas comp, and close the trove.
+     *  Get its offset coll/debt and BNB gas comp, and close the trove.
      */
     function getCappedOffsetVals(
         uint _entireTroveDebt,
@@ -45,7 +45,7 @@ contract TroveHelper is LiquityBase, Ownable, CheckContract, ITroveHelper {
         singleLiquidation.entireTroveColl = _entireTroveColl;
         uint cappedCollPortion = _entireTroveDebt.mul(systemState.getMCR()).div(_price);
         singleLiquidation.collGasCompensation = _getCollGasCompensation(cappedCollPortion);
-        singleLiquidation.LUSDGasCompensation = systemState.getLUSDGasCompensation();
+        singleLiquidation.USDSGasCompensation = systemState.getUSDSGasCompensation();
 
         singleLiquidation.debtToOffset = _entireTroveDebt;
         singleLiquidation.collToSendToSP = cappedCollPortion.sub(
@@ -91,23 +91,23 @@ contract TroveHelper is LiquityBase, Ownable, CheckContract, ITroveHelper {
     function requireAfterBootstrapPeriod() external view override {
         _requireCallerIsTroveManager();
 
-        uint systemDeploymentTime = lqtyToken.getDeploymentStartTime();
+        uint systemDeploymentTime = sableToken.getDeploymentStartTime();
         require(
             block.timestamp >= systemDeploymentTime.add(troveManager.BOOTSTRAP_PERIOD()),
             "TroveManager: Redemptions are not allowed during bootstrap phase"
         );
     }
 
-    function requireLUSDBalanceCoversRedemption(
-        ILUSDToken _lusdToken,
+    function requireUSDSBalanceCoversRedemption(
+        IUSDSToken _usdsToken,
         address _redeemer,
         uint _amount
     ) external view override {
         _requireCallerIsTroveManager();
 
         require(
-            _lusdToken.balanceOf(_redeemer) >= _amount,
-            "TroveManager: Requested redemption amount must be <= user's LUSD token balance"
+            _usdsToken.balanceOf(_redeemer) >= _amount,
+            "TroveManager: Requested redemption amount must be <= user's USDS token balance"
         );
     }
 
@@ -135,7 +135,7 @@ contract TroveHelper is LiquityBase, Ownable, CheckContract, ITroveHelper {
         );
     }
 
-    // Check whether or not the system *would be* in Recovery Mode, given an ETH:USD price, and the entire system coll and debt.
+    // Check whether or not the system *would be* in Recovery Mode, given an BNB:USD price, and the entire system coll and debt.
     function checkPotentialRecoveryMode(
         uint _entireSystemColl,
         uint _entireSystemDebt,

@@ -6,14 +6,24 @@ interface ICommunityIssuance {
     
     // --- Events ---
     
-    event LQTYTokenAddressSet(address _lqtyTokenAddress);
+    event SABLETokenAddressSet(address _sableTokenAddress);
     event StabilityPoolAddressSet(address _stabilityPoolAddress);
+    event RewardPerSecUpdated(uint256 _newRewardPerSec);
 
     // --- Functions ---
 
-    function setAddresses(address _lqtyTokenAddress, address _stabilityPoolAddress) external;
+    function setParams
+    (
+        address _sableTokenAddress, 
+        address _stabilityPoolAddress,
+        uint256 _latestRewardPerSec
+    ) external;
 
-    function balanceLQTY() external returns (uint);
+    function issueSABLE() external returns (uint);
 
-    function sendLQTY(address _account, uint _LQTYamount) external;
+    function sendSABLE(address _account, uint _SABLEamount) external;
+
+    function balanceSABLE() external returns (uint);
+
+    function updateRewardPerSec(uint _newRewardPerSec) external;
 }

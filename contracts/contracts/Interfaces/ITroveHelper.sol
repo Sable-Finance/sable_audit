@@ -5,9 +5,9 @@ pragma experimental ABIEncoderV2;
 
 import "./ILiquityBase.sol";
 import "./IStabilityPool.sol";
-import "./ILUSDToken.sol";
-import "./ILQTYToken.sol";
-import "./ILQTYStaking.sol";
+import "./IUSDSToken.sol";
+import "./ISABLEToken.sol";
+import "./ISABLEStaking.sol";
 import "./IOracleRateCalculation.sol";
 import "./ICollSurplusPool.sol";
 import "./ISortedTroves.sol";
@@ -22,7 +22,7 @@ interface ITroveHelper {
         address _troveManagerAddress,
         address _systemStateAddress,
         address _sortedTrovesAddress,
-        address _lqtyTokenAddress,
+        address _sableTokenAddress,
         address _activePoolAddress,
         address _defaultPoolAddress
     ) external;
@@ -43,8 +43,8 @@ interface ITroveHelper {
 
     function requireAfterBootstrapPeriod() external view;
 
-    function requireLUSDBalanceCoversRedemption(
-        ILUSDToken _lusdToken,
+    function requireUSDSBalanceCoversRedemption(
+        IUSDSToken _usdsToken,
         address _redeemer,
         uint _amount
     ) external view;

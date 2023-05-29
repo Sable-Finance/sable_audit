@@ -18,11 +18,10 @@ contract OracleRateCalculation is BaseMath, IOracleRateCalculation {
     ) external view override returns (uint oracleRate) {
         if (oracleKey == bytes32("PYTH")) {
             uint absDelayTime = block.timestamp > publishTimePyth 
-                ? block.timestamp - publishTimePyth
-                : publishTimePyth - block.timestamp;
+                ? block.timestamp.sub(publishTimePyth)
+                : publishTimePyth.sub(block.timestamp);
             
-            // oracleRate = deviationPyth + abs(block.timestamp - publishTimePyth) * 0.01%
-            oracleRate = deviationPyth + absDelayTime * DECIMAL_PRECISION / 10000;
+            oracleRate = deviationPyth.add(absDelayTime.mul(DECIMAL_PRECISION).div(10000));
             if (oracleRate > MAX_ORACLE_RATE_PERCENTAGE) {
                 oracleRate = MAX_ORACLE_RATE_PERCENTAGE;
             }

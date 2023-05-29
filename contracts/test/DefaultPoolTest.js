@@ -21,7 +21,7 @@ contract('DefaultPool', async accounts => {
     await defaultPool.setAddresses(mockTroveManager.address, mockActivePool.address)
   })
 
-  it('sendETHToActivePool(): fails if receiver cannot receive ETH', async () => {
+  it('sendBNBToActivePool(): fails if receiver cannot receive BNB', async () => {
     const amount = dec(1, 'ether')
 
     // start pool with `amount`
@@ -30,9 +30,9 @@ contract('DefaultPool', async accounts => {
     assert.isTrue(tx.receipt.status)
 
     // try to send ether from pool to non-payable
-    //await th.assertRevert(defaultPool.sendETHToActivePool(amount, { from: owner }), 'DefaultPool: sending ETH failed')
-    const sendETHData = th.getTransactionData('sendETHToActivePool(uint256)', [web3.utils.toHex(amount)])
-    await th.assertRevert(mockTroveManager.forward(defaultPool.address, sendETHData, { from: owner }), 'DefaultPool: sending ETH failed')
+    //await th.assertRevert(defaultPool.sendBNBToActivePool(amount, { from: owner }), 'DefaultPool: sending BNB failed')
+    const sendBNBData = th.getTransactionData('sendBNBToActivePool(uint256)', [web3.utils.toHex(amount)])
+    await th.assertRevert(mockTroveManager.forward(defaultPool.address, sendBNBData, { from: owner }), 'DefaultPool: sending BNB failed')
   })
 })
 

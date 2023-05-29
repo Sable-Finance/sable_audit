@@ -1,7 +1,7 @@
 const deploymentHelper = require("../utils/deploymentHelpers.js")
 const testHelpers = require("../utils/testHelpers.js")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
-const LUSDTokenTester = artifacts.require("./LUSDTokenTester.sol")
+const USDSTokenTester = artifacts.require("./USDSTokenTester.sol")
 
 const th = testHelpers.TestHelper
 const dec = th.dec
@@ -13,10 +13,10 @@ const timeValues = testHelpers.TimeValues
 const DEFAULT_PRICE_FEED_DATA = testHelpers.DEFAULT_PRICE_FEED_DATA
 
 
-/* NOTE: Some tests involving ETH redemption fees do not test for specific fee values.
+/* NOTE: Some tests involving BNB redemption fees do not test for specific fee values.
  * Some only test that the fees are non-zero when they should occur.
  *
- * Specific ETH gain values will depend on the final fee schedule used, and the final choices for
+ * Specific BNB gain values will depend on the final fee schedule used, and the final choices for
  * the parameter BETA in the TroveManager, which is still TBD based on economic modelling.
  * 
  */
@@ -29,7 +29,7 @@ contract('TroveManager', async accounts => {
   const [vaultAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
 
   let priceFeed
-  let lusdToken
+  let usdsToken
   let sortedTroves
   let troveManager
   let activePool
@@ -41,7 +41,7 @@ contract('TroveManager', async accounts => {
 
   let contracts
 
-  const getOpenTroveLUSDAmount = async (totalDebt) => th.getOpenTroveLUSDAmount(contracts, totalDebt)
+  const getOpenTroveUSDSAmount = async (totalDebt) => th.getOpenTroveUSDSAmount(contracts, totalDebt)
  
   const getSnapshotsRatio = async () => {
     const ratio = (await troveManager.totalStakesSnapshot())
@@ -54,16 +54,16 @@ contract('TroveManager', async accounts => {
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.troveManager = await TroveManagerTester.new()
-    contracts.lusdToken = await LUSDTokenTester.new(
+    contracts.usdsToken = await USDSTokenTester.new(
       contracts.troveManager.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
     )
     const MINT_AMOUNT = toBN(dec(100, 18))
-    const LQTYContracts = await deploymentHelper.deployLQTYContracts(vaultAddress, MINT_AMOUNT)
+    const SABLEContracts = await deploymentHelper.deploySABLEContracts(vaultAddress, MINT_AMOUNT)
 
     priceFeed = contracts.priceFeedTestnet
-    lusdToken = contracts.lusdToken
+    usdsToken = contracts.usdsToken
     sortedTroves = contracts.sortedTroves
     troveManager = contracts.troveManager
     activePool = contracts.activePool
@@ -73,13 +73,13 @@ contract('TroveManager', async accounts => {
     borrowerOperations = contracts.borrowerOperations
     hintHelpers = contracts.hintHelpers
 
-    lqtyStaking = LQTYContracts.lqtyStaking
-    lqtyToken = LQTYContracts.lqtyToken
-    communityIssuance = LQTYContracts.communityIssuance
-    lockupContractFactory = LQTYContracts.lockupContractFactory
+    sableStaking = SABLEContracts.sableStaking
+    sableToken = SABLEContracts.sableToken
+    communityIssuance = SABLEContracts.communityIssuance
+    lockupContractFactory = SABLEContracts.lockupContractFactory
 
-    await deploymentHelper.connectCoreContracts(contracts, LQTYContracts)
-    await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts)
+    await deploymentHelper.connectCoreContracts(contracts, SABLEContracts)
+    await deploymentHelper.connectSABLEContractsToCore(SABLEContracts, contracts)
 
     // funding PriceFeed contract
     await web3.eth.sendTransaction({from: funder, to: priceFeed.address, value: 1000000000})
@@ -89,19 +89,19 @@ contract('TroveManager', async accounts => {
     await priceFeed.setPrice(dec(100, 18))
   
     // Make 1 mega troves A at ~50% total collateral
-    await borrowerOperations.openTrove(th._100pct, await getOpenTroveLUSDAmount(dec(1, 31)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: A, value: dec(2, 29) })
+    await borrowerOperations.openTrove(th._100pct, await getOpenTroveUSDSAmount(dec(1, 31)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: A, value: dec(2, 29) })
     
     // Make 5 large troves B, C, D, E, F at ~10% total collateral
-    await borrowerOperations.openTrove(th._100pct, await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: B, value: dec(4, 28) })
-    await borrowerOperations.openTrove(th._100pct, await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: C, value: dec(4, 28) })
-    await borrowerOperations.openTrove(th._100pct, await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: D, value: dec(4, 28) })
-    await borrowerOperations.openTrove(th._100pct, await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: E, value: dec(4, 28) })
-    await borrowerOperations.openTrove(th._100pct, await getOpenTroveLUSDAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: F, value: dec(4, 28) })
+    await borrowerOperations.openTrove(th._100pct, await getOpenTroveUSDSAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: B, value: dec(4, 28) })
+    await borrowerOperations.openTrove(th._100pct, await getOpenTroveUSDSAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: C, value: dec(4, 28) })
+    await borrowerOperations.openTrove(th._100pct, await getOpenTroveUSDSAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: D, value: dec(4, 28) })
+    await borrowerOperations.openTrove(th._100pct, await getOpenTroveUSDSAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: E, value: dec(4, 28) })
+    await borrowerOperations.openTrove(th._100pct, await getOpenTroveUSDSAmount(dec(2, 30)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: F, value: dec(4, 28) })
   
     // Make 10 tiny troves at relatively negligible collateral (~1e-9 of total)
     const tinyTroves = accounts.slice(10, 20)
     for (account of tinyTroves) {
-      await borrowerOperations.openTrove(th._100pct, await getOpenTroveLUSDAmount(dec(1, 22)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: account, value: dec(2, 20) })
+      await borrowerOperations.openTrove(th._100pct, await getOpenTroveUSDSAmount(dec(1, 22)), ZERO_ADDRESS, ZERO_ADDRESS, DEFAULT_PRICE_FEED_DATA, { from: account, value: dec(2, 20) })
     }
 
     // liquidate 1 trove at ~50% total system collateral
@@ -112,13 +112,13 @@ contract('TroveManager', async accounts => {
     console.log(`totalStakesSnapshot after L1: ${await troveManager.totalStakesSnapshot()}`)
     console.log(`totalCollateralSnapshot after L1: ${await troveManager.totalCollateralSnapshot()}`)
     console.log(`Snapshots ratio after L1: ${await getSnapshotsRatio()}`)
-    console.log(`B pending ETH reward after L1: ${await troveManager.getPendingETHReward(B)}`)
+    console.log(`B pending BNB reward after L1: ${await troveManager.getPendingBNBReward(B)}`)
     console.log(`B stake after L1: ${(await troveManager.Troves(B))[2]}`)
 
     // adjust trove B 1 wei: apply rewards
     let adjustTroveParam1 = {
       collWithdrawal: 0,
-      LUSDChange: 1,
+      USDSChange: 1,
       isDebtIncrease: false,
       upperHint: ZERO_ADDRESS,
       lowerHint: ZERO_ADDRESS,
@@ -137,7 +137,7 @@ contract('TroveManager', async accounts => {
       console.log(`Snapshots ratio after L${idx + 2}: ${await getSnapshotsRatio()}`)
       let adjustTroveParam2 = {
         collWithdrawal: 0,
-        LUSDChange: 1,
+        USDSChange: 1,
         isDebtIncrease: false,
         upperHint: ZERO_ADDRESS,
         lowerHint: ZERO_ADDRESS,

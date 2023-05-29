@@ -12,12 +12,11 @@ const dec = th.dec
 contract('Pool Manager: Sum-Product rounding errors', async accounts => {
 
   const whale = accounts[0]
-  const funder = accounts[1]
 
   let contracts
 
   let priceFeed
-  let lusdToken
+  let usdsToken
   let stabilityPool
   let troveManager
   let borrowerOperations
@@ -26,25 +25,23 @@ contract('Pool Manager: Sum-Product rounding errors', async accounts => {
     contracts = await deployLiquity()
     
     priceFeed = contracts.priceFeedTestnet
-    lusdToken = contracts.lusdToken
+    usdsToken = contracts.usdsToken
     stabilityPool = contracts.stabilityPool
     troveManager = contracts.troveManager
     borrowerOperations = contracts.borrowerOperations
 
     const contractAddresses = getAddresses(contracts)
     await connectContracts(contracts, contractAddresses)
-    // funding PriceFeed contract
-    await web3.eth.sendTransaction({from: funder, to: priceFeed.address, value: 1000000000})
   })
 
   // skipped to not slow down CI
-  it.skip("Rounding errors: 100 deposits of 100LUSD into SP, then 200 liquidations of 49LUSD", async () => {
+  it.skip("Rounding errors: 100 deposits of 100USDS into SP, then 200 liquidations of 49USDS", async () => {
     const owner = accounts[0]
     const depositors = accounts.slice(1, 101)
     const defaulters = accounts.slice(101, 301)
 
     for (let account of depositors) {
-      await openTrove({ extraLUSDAmount: toBN(dec(10000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: account } })
+      await openTrove({ extraUSDSAmount: toBN(dec(10000, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: account } })
       await stabilityPool.provideToSP(dec(100, 18), { from: account })
     }
 
@@ -59,17 +56,17 @@ contract('Pool Manager: Sum-Product rounding errors', async accounts => {
 
     // Defaulters liquidated
     for (let defaulter of defaulters) {
-      await troveManager.liquidate(defaulter,DEFAULT_PRICE_FEED_DATA, { from: owner });
+      await troveManager.liquidate(defaulter, { from: owner });
     }
 
-    const SP_TotalDeposits = await stabilityPool.getTotalLUSDDeposits()
-    const SP_ETH = await stabilityPool.getETH()
-    const compoundedDeposit = await stabilityPool.getCompoundedLUSDDeposit(depositors[0])
-    const ETH_Gain = await stabilityPool.getCurrentETHGain(depositors[0])
+    const SP_TotalDeposits = await stabilityPool.getTotalUSDSDeposits()
+    const SP_BNB = await stabilityPool.getBNB()
+    const compoundedDeposit = await stabilityPool.getCompoundedUSDSDeposit(depositors[0])
+    const BNB_Gain = await stabilityPool.getCurrentBNBGain(depositors[0])
 
     // Check depostiors receive their share without too much error
     assert.isAtMost(th.getDifference(SP_TotalDeposits.div(th.toBN(depositors.length)), compoundedDeposit), 100000)
-    assert.isAtMost(th.getDifference(SP_ETH.div(th.toBN(depositors.length)), ETH_Gain), 100000)
+    assert.isAtMost(th.getDifference(SP_BNB.div(th.toBN(depositors.length)), BNB_Gain), 100000)
   })
 })
 

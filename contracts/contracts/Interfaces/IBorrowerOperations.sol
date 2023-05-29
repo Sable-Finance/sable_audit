@@ -18,8 +18,8 @@ interface IBorrowerOperations {
     event CollSurplusPoolAddressChanged(address _collSurplusPoolAddress);
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
-    event LUSDTokenAddressChanged(address _lusdTokenAddress);
-    event LQTYStakingAddressChanged(address _lqtyStakingAddress);
+    event USDSTokenAddressChanged(address _usdsTokenAddress);
+    event SABLEStakingAddressChanged(address _sableStakingAddress);
     event OracleRateCalcAddressChanged(address _oracleRateCalcAddress);
 
     event TroveCreated(address indexed _borrower, uint arrayIndex);
@@ -30,7 +30,7 @@ interface IBorrowerOperations {
         uint stake,
         uint8 operation
     );
-    event LUSDBorrowingFeePaid(address indexed _borrower, uint _LUSDFee);
+    event USDSBorrowingFeePaid(address indexed _borrower, uint _USDSFee);
 
     // --- Functions ---
 
@@ -43,25 +43,25 @@ interface IBorrowerOperations {
         address collSurplusPoolAddress;
         address priceFeedAddress;
         address sortedTrovesAddress;
-        address lusdTokenAddress;
-        address lqtyStakingAddress;
+        address usdsTokenAddress;
+        address sableStakingAddress;
         address systemStateAddress;
         address oracleRateCalcAddress;
     }
 
     struct TriggerBorrowingFeeParam {
         ITroveManager troveManager;
-        ILUSDToken lusdToken;
-        uint LUSDAmount;
+        IUSDSToken usdsToken;
+        uint USDSAmount;
         uint maxFeePercentage;
         uint oracleRate;
     }
 
-    struct WithdrawLUSDParam {
+    struct WithdrawUSDSParam {
         IActivePool activePool;
-        ILUSDToken lusdToken;
+        IUSDSToken usdsToken;
         address account;
-        uint LUSDAmount;
+        uint USDSAmount;
         uint netDebtIncrease;
     }
 
@@ -74,7 +74,7 @@ interface IBorrowerOperations {
 
     function openTrove(
         uint _maxFee,
-        uint _LUSDAmount,
+        uint _USDSAmount,
         address _upperHint,
         address _lowerHint,
         bytes[] calldata priceFeedUpdatedata
@@ -86,7 +86,7 @@ interface IBorrowerOperations {
         bytes[] calldata priceFeedUpdatedata
     ) external payable;
 
-    function moveETHGainToTrove(
+    function moveBNBGainToTrove(
         address _user,
         address _upperHint,
         address _lowerHint,
@@ -100,7 +100,7 @@ interface IBorrowerOperations {
         bytes[] calldata priceFeedUpdatedata
     ) external;
 
-    function withdrawLUSD(
+    function withdrawUSDS(
         uint _maxFee,
         uint _amount,
         address _upperHint,
@@ -108,7 +108,7 @@ interface IBorrowerOperations {
         bytes[] calldata priceFeedUpdatedata
     ) external;
 
-    function repayLUSD(
+    function repayUSDS(
         uint _amount, 
         address _upperHint, 
         address _lowerHint,
@@ -119,7 +119,7 @@ interface IBorrowerOperations {
 
     struct AdjustTroveParam {
         uint collWithdrawal;
-        uint LUSDChange;
+        uint USDSChange;
         bool isDebtIncrease;
         address upperHint;
         address lowerHint;

@@ -1,7 +1,7 @@
 const SortedTroves = artifacts.require("./SortedTroves.sol");
 const TroveManager = artifacts.require("./TroveManager.sol");
 const PriceFeedTestnet = artifacts.require("./PriceFeedTestnet.sol");
-const LUSDToken = artifacts.require("./LUSDToken.sol");
+const USDSToken = artifacts.require("./USDSToken.sol");
 const ActivePool = artifacts.require("./ActivePool.sol");
 const DefaultPool = artifacts.require("./DefaultPool.sol");
 const StabilityPool = artifacts.require("./StabilityPool.sol");
@@ -16,11 +16,11 @@ const MockPyth = artifacts.require("./MockPyth.sol");
 const OracleRateCalculation = artifacts.require("./OracleRateCalculation.sol");
 const TroveHelper = artifacts.require("./TroveHelper.sol");
 
-const LQTYStaking = artifacts.require("./LQTYStaking.sol");
-const LQTYToken = artifacts.require("./LQTYToken.sol");
+const SABLEStaking = artifacts.require("./SABLEStaking.sol");
+const SABLEToken = artifacts.require("./SABLEToken.sol");
 const CommunityIssuance = artifacts.require("./CommunityIssuance.sol");
 
-const LQTYTokenTester = artifacts.require("./LQTYTokenTester.sol");
+const SABLETokenTester = artifacts.require("./SABLETokenTester.sol");
 const CommunityIssuanceTester = artifacts.require("./CommunityIssuanceTester.sol");
 const StabilityPoolTester = artifacts.require("./StabilityPoolTester.sol");
 const ActivePoolTester = artifacts.require("./ActivePoolTester.sol");
@@ -28,7 +28,7 @@ const DefaultPoolTester = artifacts.require("./DefaultPoolTester.sol");
 const LiquityMathTester = artifacts.require("./LiquityMathTester.sol");
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol");
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol");
-const LUSDTokenTester = artifacts.require("./LUSDTokenTester.sol");
+const USDSTokenTester = artifacts.require("./USDSTokenTester.sol");
 
 // Proxy scripts
 const BorrowerOperationsScript = artifacts.require("BorrowerOperationsScript");
@@ -36,7 +36,7 @@ const BorrowerWrappersScript = artifacts.require("BorrowerWrappersScript");
 const TroveManagerScript = artifacts.require("TroveManagerScript");
 const StabilityPoolScript = artifacts.require("StabilityPoolScript");
 const TokenScript = artifacts.require("TokenScript");
-const LQTYStakingScript = artifacts.require("LQTYStakingScript");
+const SABLEStakingScript = artifacts.require("SABLEStakingScript");
 const testHelpers = require("./testHelpers.js");
 
 const hardHatAddressDeployDefault = "0x31c57298578f7508B5982062cfEc5ec8BD346247";
@@ -50,16 +50,16 @@ const {
   StabilityPoolProxy,
   SortedTrovesProxy,
   TokenProxy,
-  LQTYStakingProxy
+  SABLEStakingProxy
 } = require("../utils/proxyHelpers.js");
 
 /* "Liquity core" consists of all contracts in the core Liquity system.
 
-LQTY contracts consist of only those contracts related to the LQTY Token:
+SABLE contracts consist of only those contracts related to the SABLE Token:
 
--the LQTY token
+-the SABLE token
 -the Lockup factory and lockup contracts
--the LQTYStaking contract
+-the SABLEStaking contract
 -the CommunityIssuance contract 
 */
 
@@ -83,15 +83,15 @@ class DeploymentHelper {
     }
   }
 
-  static async deployLQTYContracts(vaultAddress, mintAmount) {
+  static async deploySABLEContracts(vaultAddress, mintAmount) {
     const cmdLineArgs = process.argv;
     const frameworkPath = cmdLineArgs[1];
     // console.log(`Framework used:  ${frameworkPath}`)
 
     if (frameworkPath.includes("hardhat")) {
-      return this.deployLQTYContractsHardhat(vaultAddress, mintAmount);
+      return this.deploySABLEContractsHardhat(vaultAddress, mintAmount);
     } else if (frameworkPath.includes("truffle")) {
-      return this.deployLQTYContractsTruffle(vaultAddress, mintAmount);
+      return this.deploySABLEContractsTruffle(vaultAddress, mintAmount);
     }
   }
 
@@ -107,7 +107,7 @@ class DeploymentHelper {
     const functionCaller = await FunctionCaller.new();
     const borrowerOperations = await BorrowerOperations.new();
     const hintHelpers = await HintHelpers.new();
-    const lusdToken = await LUSDToken.new(
+    const usdsToken = await USDSToken.new(
       troveManager.address,
       stabilityPool.address,
       borrowerOperations.address
@@ -122,7 +122,7 @@ class DeploymentHelper {
     const mockPyth = await MockPyth.new(0, 1);
     const troveHelper = await TroveHelper.new();
 
-    LUSDToken.setAsDeployed(lusdToken);
+    USDSToken.setAsDeployed(usdsToken);
     DefaultPool.setAsDeployed(defaultPool);
     PriceFeedTestnet.setAsDeployed(priceFeedTestnet);
     SortedTroves.setAsDeployed(sortedTroves);
@@ -142,7 +142,7 @@ class DeploymentHelper {
 
     const coreContracts = {
       priceFeedTestnet,
-      lusdToken,
+      usdsToken,
       sortedTroves,
       troveManager,
       activePool,
@@ -180,7 +180,7 @@ class DeploymentHelper {
     testerContracts.troveManager = await TroveManagerTester.new();
     testerContracts.functionCaller = await FunctionCaller.new();
     testerContracts.hintHelpers = await HintHelpers.new();
-    testerContracts.lusdToken = await LUSDTokenTester.new(
+    testerContracts.usdsToken = await USDSTokenTester.new(
       testerContracts.troveManager.address,
       testerContracts.stabilityPool.address,
       testerContracts.borrowerOperations.address
@@ -197,50 +197,50 @@ class DeploymentHelper {
     return testerContracts;
   }
 
-  static async deployLQTYContractsHardhat(vaultAddress, mintAmount) {
-    const lqtyStaking = await LQTYStaking.new();
+  static async deploySABLEContractsHardhat(vaultAddress, mintAmount) {
+    const sableStaking = await SABLEStaking.new();
     const communityIssuance = await CommunityIssuance.new();
 
-    LQTYStaking.setAsDeployed(lqtyStaking);
+    SABLEStaking.setAsDeployed(sableStaking);
     CommunityIssuance.setAsDeployed(communityIssuance);
 
-    // Deploy LQTY Token, passing Community Issuance and Factory addresses to the constructor
-    const lqtyToken = await LQTYToken.new(
-      lqtyStaking.address,
+    // Deploy SABLE Token, passing Community Issuance and Factory addresses to the constructor
+    const sableToken = await SABLEToken.new(
+      sableStaking.address,
       vaultAddress,
       mintAmount
     );
-    LQTYToken.setAsDeployed(lqtyToken);
+    SABLEToken.setAsDeployed(sableToken);
 
-    const LQTYContracts = {
-      lqtyStaking,
+    const SABLEContracts = {
+      sableStaking,
       communityIssuance,
-      lqtyToken
+      sableToken
     };
-    return LQTYContracts;
+    return SABLEContracts;
   }
 
-  static async deployLQTYTesterContractsHardhat(vaultAddress, mintAmount) {
-    const lqtyStaking = await LQTYStaking.new();
+  static async deploySABLETesterContractsHardhat(vaultAddress, mintAmount) {
+    const sableStaking = await SABLEStaking.new();
     const communityIssuance = await CommunityIssuanceTester.new();
 
-    LQTYStaking.setAsDeployed(lqtyStaking);
+    SABLEStaking.setAsDeployed(sableStaking);
     CommunityIssuanceTester.setAsDeployed(communityIssuance);
 
-    // Deploy LQTY Token, passing Community Issuance and Factory addresses to the constructor
-    const lqtyToken = await LQTYTokenTester.new(
-      lqtyStaking.address,
+    // Deploy SABLE Token, passing Community Issuance and Factory addresses to the constructor
+    const sableToken = await SABLETokenTester.new(
+      sableStaking.address,
       vaultAddress,
       mintAmount
     );
-    LQTYTokenTester.setAsDeployed(lqtyToken);
+    SABLETokenTester.setAsDeployed(sableToken);
 
-    const LQTYContracts = {
-      lqtyStaking,
+    const SABLEContracts = {
+      sableStaking,
       communityIssuance,
-      lqtyToken
+      sableToken
     };
-    return LQTYContracts;
+    return SABLEContracts;
   }
 
   static async deployLiquityCoreTruffle() {
@@ -255,7 +255,7 @@ class DeploymentHelper {
     const functionCaller = await FunctionCaller.new();
     const borrowerOperations = await BorrowerOperations.new();
     const hintHelpers = await HintHelpers.new();
-    const lusdToken = await LUSDToken.new(
+    const usdsToken = await USDSToken.new(
       troveManager.address,
       stabilityPool.address,
       borrowerOperations.address
@@ -272,7 +272,7 @@ class DeploymentHelper {
 
     const coreContracts = {
       priceFeedTestnet,
-      lusdToken,
+      usdsToken,
       sortedTroves,
       troveManager,
       activePool,
@@ -292,28 +292,28 @@ class DeploymentHelper {
     return coreContracts;
   }
 
-  static async deployLQTYContractsTruffle(vaultAddress, mintAmount) {
-    const lqtyStaking = await lqtyStaking.new();
+  static async deploySABLEContractsTruffle(vaultAddress, mintAmount) {
+    const sableStaking = await sableStaking.new();
     const communityIssuance = await CommunityIssuance.new();
 
-    /* Deploy LQTY Token, passing Community Issuance,  LQTYStaking, and Factory addresses 
+    /* Deploy SABLE Token, passing Community Issuance,  SABLEStaking, and Factory addresses 
     to the constructor  */
-    const lqtyToken = await LQTYToken.new(
-      lqtyStaking.address,
+    const sableToken = await SABLEToken.new(
+      sableStaking.address,
       vaultAddress,
       mintAmount
     );
 
-    const LQTYContracts = {
-      lqtyStaking,
+    const SABLEContracts = {
+      sableStaking,
       communityIssuance,
-      lqtyToken
+      sableToken
     };
-    return LQTYContracts;
+    return SABLEContracts;
   }
 
-  static async deployLUSDToken(contracts) {
-    contracts.lusdToken = await LUSDToken.new(
+  static async deployUSDSToken(contracts) {
+    contracts.usdsToken = await USDSToken.new(
       contracts.troveManager.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
@@ -321,8 +321,8 @@ class DeploymentHelper {
     return contracts;
   }
 
-  static async deployLUSDTokenTester(contracts) {
-    contracts.lusdToken = await LUSDTokenTester.new(
+  static async deployUSDSTokenTester(contracts) {
+    contracts.usdsToken = await USDSTokenTester.new(
       contracts.troveManager.address,
       contracts.stabilityPool.address,
       contracts.borrowerOperations.address
@@ -330,13 +330,13 @@ class DeploymentHelper {
     return contracts;
   }
 
-  static async deployProxyScripts(contracts, LQTYContracts, owner, users) {
+  static async deployProxyScripts(contracts, SABLEContracts, owner, users) {
     const proxies = await buildUserProxies(users);
 
     const borrowerWrappersScript = await BorrowerWrappersScript.new(
       contracts.borrowerOperations.address,
       contracts.troveManager.address,
-      LQTYContracts.lqtyStaking.address
+      SABLEContracts.sableStaking.address
     );
     contracts.borrowerWrappers = new BorrowerWrappersProxy(
       owner,
@@ -372,33 +372,33 @@ class DeploymentHelper {
 
     contracts.sortedTroves = new SortedTrovesProxy(owner, proxies, contracts.sortedTroves);
 
-    const lusdTokenScript = await TokenScript.new(contracts.lusdToken.address);
-    contracts.lusdToken = new TokenProxy(
+    const usdsTokenScript = await TokenScript.new(contracts.usdsToken.address);
+    contracts.usdsToken = new TokenProxy(
       owner,
       proxies,
-      lusdTokenScript.address,
-      contracts.lusdToken
+      usdsTokenScript.address,
+      contracts.usdsToken
     );
 
-    const lqtyTokenScript = await TokenScript.new(LQTYContracts.lqtyToken.address);
-    LQTYContracts.lqtyToken = new TokenProxy(
+    const sableTokenScript = await TokenScript.new(SABLEContracts.sableToken.address);
+    SABLEContracts.sableToken = new TokenProxy(
       owner,
       proxies,
-      lqtyTokenScript.address,
-      LQTYContracts.lqtyToken
+      sableTokenScript.address,
+      SABLEContracts.sableToken
     );
 
-    const lqtyStakingScript = await LQTYStakingScript.new(LQTYContracts.lqtyStaking.address);
-    LQTYContracts.lqtyStaking = new LQTYStakingProxy(
+    const sableStakingScript = await SABLEStakingScript.new(SABLEContracts.sableStaking.address);
+    SABLEContracts.sableStaking = new SABLEStakingProxy(
       owner,
       proxies,
-      lqtyStakingScript.address,
-      LQTYContracts.lqtyStaking
+      sableStakingScript.address,
+      SABLEContracts.sableStaking
     );
   }
 
   // Connect contracts to their dependencies
-  static async connectCoreContracts(contracts, LQTYContracts) {
+  static async connectCoreContracts(contracts, SABLEContracts) {
     // set configs Systemstate
     await contracts.systemState.setConfigs(
       contracts.timeLock.address,
@@ -430,10 +430,10 @@ class DeploymentHelper {
       gasPoolAddress: contracts.gasPool.address,
       collSurplusPoolAddress: contracts.collSurplusPool.address,
       priceFeedAddress: contracts.priceFeedTestnet.address,
-      lusdTokenAddress: contracts.lusdToken.address,
+      usdsTokenAddress: contracts.usdsToken.address,
       sortedTrovesAddress: contracts.sortedTroves.address,
-      lqtyTokenAddress: LQTYContracts.lqtyToken.address,
-      lqtyStakingAddress: LQTYContracts.lqtyStaking.address,
+      sableTokenAddress: SABLEContracts.sableToken.address,
+      sableStakingAddress: SABLEContracts.sableStaking.address,
       systemStateAddress: contracts.systemState.address,
       oracleRateCalcAddress: contracts.oracleCalc.address,
       troveHelperAddress: contracts.troveHelper.address
@@ -451,8 +451,8 @@ class DeploymentHelper {
       collSurplusPoolAddress: contracts.collSurplusPool.address,
       priceFeedAddress: contracts.priceFeedTestnet.address,
       sortedTrovesAddress: contracts.sortedTroves.address,
-      lusdTokenAddress: contracts.lusdToken.address,
-      lqtyStakingAddress: LQTYContracts.lqtyStaking.address,
+      usdsTokenAddress: contracts.usdsToken.address,
+      sableStakingAddress: SABLEContracts.sableStaking.address,
       systemStateAddress: contracts.systemState.address,
       oracleRateCalcAddress: contracts.oracleCalc.address
     };
@@ -469,7 +469,7 @@ class DeploymentHelper {
       contracts.troveManager.address,
       contracts.systemState.address,
       contracts.sortedTroves.address,
-      LQTYContracts.lqtyToken.address,
+      SABLEContracts.sableToken.address,
       contracts.activePool.address,
       contracts.defaultPool.address
     );
@@ -479,13 +479,11 @@ class DeploymentHelper {
       contracts.borrowerOperations.address,
       contracts.troveManager.address,
       contracts.activePool.address,
-      contracts.lusdToken.address,
+      contracts.usdsToken.address,
       contracts.sortedTroves.address,
       contracts.priceFeedTestnet.address,
-      LQTYContracts.communityIssuance.address,
-      contracts.systemState.address,
-      contracts.timeLock.address,
-      toBN(1e18)
+      SABLEContracts.communityIssuance.address,
+      contracts.systemState.address
     );
 
     await contracts.activePool.setAddresses(
@@ -514,18 +512,19 @@ class DeploymentHelper {
     );
   }
 
-  static async connectLQTYContractsToCore(LQTYContracts, coreContracts) {
-    await LQTYContracts.lqtyStaking.setAddresses(
-      LQTYContracts.lqtyToken.address,
-      coreContracts.lusdToken.address,
+  static async connectSABLEContractsToCore(SABLEContracts, coreContracts) {
+    await SABLEContracts.sableStaking.setAddresses(
+      SABLEContracts.sableToken.address,
+      coreContracts.usdsToken.address,
       coreContracts.troveManager.address,
       coreContracts.borrowerOperations.address,
       coreContracts.activePool.address
     );
 
-    await LQTYContracts.communityIssuance.setAddresses(
-      LQTYContracts.lqtyToken.address,
-      coreContracts.stabilityPool.address
+    await SABLEContracts.communityIssuance.setParams(
+      SABLEContracts.sableToken.address,
+      coreContracts.stabilityPool.address,
+      toBN(1e18).toString()
     );
   }
 

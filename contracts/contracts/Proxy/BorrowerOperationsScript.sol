@@ -17,12 +17,12 @@ contract BorrowerOperationsScript is CheckContract {
 
     function openTrove(
         uint _maxFee, 
-        uint _LUSDAmount, 
+        uint _USDSAmount, 
         address _upperHint, 
         address _lowerHint,
         bytes[] calldata priceFeedUpdateData
     ) external payable {
-        borrowerOperations.openTrove{ value: msg.value }(_maxFee, _LUSDAmount, _upperHint, _lowerHint, priceFeedUpdateData);
+        borrowerOperations.openTrove{ value: msg.value }(_maxFee, _USDSAmount, _upperHint, _lowerHint, priceFeedUpdateData);
     }
 
     function addColl(
@@ -42,23 +42,23 @@ contract BorrowerOperationsScript is CheckContract {
         borrowerOperations.withdrawColl(_amount, _upperHint, _lowerHint, priceFeedUpdateData);
     }
 
-    function withdrawLUSD(
+    function withdrawUSDS(
         uint _maxFee, 
         uint _amount, 
         address _upperHint, 
         address _lowerHint,
         bytes[] calldata priceFeedUpdateData
     ) external {
-        borrowerOperations.withdrawLUSD(_maxFee, _amount, _upperHint, _lowerHint, priceFeedUpdateData);
+        borrowerOperations.withdrawUSDS(_maxFee, _amount, _upperHint, _lowerHint, priceFeedUpdateData);
     }
 
-    function repayLUSD(
+    function repayUSDS(
         uint _amount, 
         address _upperHint, 
         address _lowerHint,
         bytes[] calldata priceFeedUpdateData
     ) external {
-        borrowerOperations.repayLUSD(_amount, _upperHint, _lowerHint, priceFeedUpdateData);
+        borrowerOperations.repayUSDS(_amount, _upperHint, _lowerHint, priceFeedUpdateData);
     }
 
     function closeTrove(bytes[] calldata priceFeedUpdateData) external {

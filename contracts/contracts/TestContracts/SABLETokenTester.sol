@@ -2,14 +2,14 @@
 
 pragma solidity 0.6.11;
 
-import "../LQTY/LQTYToken.sol";
+import "../SABLE/SABLEToken.sol";
 
-contract LQTYTokenTester is LQTYToken {
+contract SABLETokenTester is SABLEToken {
     constructor(
-        address _lqtyStakingAddress,
+        address _sableStakingAddress,
         address _vaultAddress,
         uint256 _mintAmount
-    ) public LQTYToken(_lqtyStakingAddress, _vaultAddress, _mintAmount) {}
+    ) public SABLEToken(_sableStakingAddress, _vaultAddress, _mintAmount) {}
 
     function unprotectedMint(address account, uint256 amount) external {
         // No check for the caller here
@@ -17,9 +17,9 @@ contract LQTYTokenTester is LQTYToken {
         _mint(account, amount);
     }
 
-    function unprotectedSendToLQTYStaking(address _sender, uint256 _amount) external {
+    function unprotectedSendToSABLEStaking(address _sender, uint256 _amount) external {
         // No check for the caller here
-        _transfer(_sender, lqtyStakingAddress, _amount);
+        _transfer(_sender, sableStakingAddress, _amount);
     }
 
     function callInternalApprove(

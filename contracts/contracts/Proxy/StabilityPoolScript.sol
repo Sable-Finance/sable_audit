@@ -28,11 +28,11 @@ contract StabilityPoolScript is CheckContract {
         stabilityPool.withdrawFromSP(_amount, priceFeedUpdateData);
     }
 
-    function withdrawETHGainToTrove(
+    function withdrawBNBGainToTrove(
         address _upperHint, 
         address _lowerHint,
         bytes[] calldata priceFeedUpdateData
     ) external {
-        stabilityPool.withdrawETHGainToTrove(_upperHint, _lowerHint, priceFeedUpdateData);
+        stabilityPool.withdrawBNBGainToTrove(_upperHint, _lowerHint, priceFeedUpdateData);
     }
 }

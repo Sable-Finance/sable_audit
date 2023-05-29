@@ -9,11 +9,11 @@ const assertRevert = th.assertRevert
 const toBN = th.toBN
 const dec = th.dec
 
-contract('Deploying the LQTY contracts: LCF, CI, LQTYStaking, and LQTYToken ', async accounts => {
+contract('Deploying the SABLE contracts: LCF, CI, SABLEStaking, and SABLEToken ', async accounts => {
   const [liquityAG, A, B] = accounts;
   const [bountyAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
 
-  let LQTYContracts
+  let SABLEContracts
 
   const oneMillion = toBN(1000000)
   const digits = toBN(1e18)
@@ -22,14 +22,14 @@ contract('Deploying the LQTY contracts: LCF, CI, LQTYStaking, and LQTYToken ', a
 
   beforeEach(async () => {
     // Deploy all contracts from the first account
-    LQTYContracts = await deploymentHelper.deployLQTYContracts(bountyAddress, lpRewardsAddress, multisig)
+    SABLEContracts = await deploymentHelper.deploySABLEContracts(bountyAddress, oneMillion)
     
 
-    lqtyStaking = LQTYContracts.lqtyStaking
-    lqtyToken = LQTYContracts.lqtyToken
-    communityIssuance = LQTYContracts.communityIssuance
+    sableStaking = SABLEContracts.sableStaking
+    sableToken = SABLEContracts.sableToken
+    communityIssuance = SABLEContracts.communityIssuance
 
-    //LQTY Staking and CommunityIssuance have not yet had their setters called, so are not yet
+    //SABLE Staking and CommunityIssuance have not yet had their setters called, so are not yet
     // connected to the rest of the system
   })
 
@@ -42,9 +42,9 @@ contract('Deploying the LQTY contracts: LCF, CI, LQTYStaking, and LQTYToken ', a
     })
   })
 
-  describe('LQTYStaking deployment', async accounts => {
+  describe('SABLEStaking deployment', async accounts => {
     it("Stores the deployer's address", async () => {
-      const storedDeployerAddress = await lqtyStaking.owner()
+      const storedDeployerAddress = await sableStaking.owner()
 
       assert.equal(liquityAG, storedDeployerAddress)
     })

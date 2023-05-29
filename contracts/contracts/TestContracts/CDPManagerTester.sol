@@ -24,16 +24,16 @@ contract TroveManagerTester is TroveManager {
         return _getCollGasCompensation(_coll);
     }
 
-    function getLUSDGasCompensation() external view returns (uint) {
-        // uint LUSD_GAS_COMPENSATION = systemState.getLUSDGasCompensation();
-        uint LUSD_GAS_COMPENSATION = _systemState.getLUSDGasCompensation();
-        return LUSD_GAS_COMPENSATION;
+    function getUSDSGasCompensation() external view returns (uint) {
+        // uint USDS_GAS_COMPENSATION = systemState.getUSDSGasCompensation();
+        uint USDS_GAS_COMPENSATION = _systemState.getUSDSGasCompensation();
+        return USDS_GAS_COMPENSATION;
     }
 
     function getCompositeDebt(uint _debt) external view returns (uint) {
         // return _getCompositeDebt(_debt);
-        uint LUSD_GAS_COMPENSATION = _systemState.getLUSDGasCompensation();
-        return _debt.add(LUSD_GAS_COMPENSATION);
+        uint USDS_GAS_COMPENSATION = _systemState.getUSDSGasCompensation();
+        return _debt.add(USDS_GAS_COMPENSATION);
     }
 
     function unprotectedDecayBaseRateFromBorrowing() external returns (uint) {
@@ -57,8 +57,8 @@ contract TroveManagerTester is TroveManager {
         baseRate = _baseRate;
     }
 
-    function callGetRedemptionFee(uint _ETHDrawn, uint _oracleRate) external view returns (uint) {
-        _getRedemptionFee(_ETHDrawn, _oracleRate);
+    function callGetRedemptionFee(uint _BNBDrawn, uint _oracleRate) external view returns (uint) {
+        _getRedemptionFee(_BNBDrawn, _oracleRate);
     }
 
     function getActualDebtFromComposite(uint _debtVal) external view returns (uint) {

@@ -65,7 +65,7 @@ contract BorrowerOperationsTester is BorrowerOperations {
     ) external payable {
         AdjustTroveParam memory adjustTroveParam = AdjustTroveParam({
             collWithdrawal: _collWithdrawal,
-            LUSDChange: _debtChange,
+            USDSChange: _debtChange,
             isDebtIncrease: _isDebtIncrease,
             upperHint: _upperHint,
             lowerHint: _lowerHint,

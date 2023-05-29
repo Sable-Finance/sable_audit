@@ -6,24 +6,24 @@ pragma experimental ABIEncoderV2;
 import "../TroveManager.sol";
 import "../BorrowerOperations.sol";
 import "../StabilityPool.sol";
-import "../LUSDToken.sol";
+import "../USDSToken.sol";
 
 contract EchidnaProxy {
     TroveManager troveManager;
     BorrowerOperations borrowerOperations;
     StabilityPool stabilityPool;
-    LUSDToken lusdToken;
+    USDSToken usdsToken;
 
     constructor(
         TroveManager _troveManager,
         BorrowerOperations _borrowerOperations,
         StabilityPool _stabilityPool,
-        LUSDToken _lusdToken
+        USDSToken _usdsToken
     ) public {
         troveManager = _troveManager;
         borrowerOperations = _borrowerOperations;
         stabilityPool = _stabilityPool;
-        lusdToken = _lusdToken;
+        usdsToken = _usdsToken;
     }
 
     receive() external payable {
@@ -54,7 +54,7 @@ contract EchidnaProxy {
     }
 
     function redeemCollateralPrx(
-        uint _LUSDAmount,
+        uint _USDSAmount,
         address _firstRedemptionHint,
         address _upperPartialRedemptionHint,
         address _lowerPartialRedemptionHint,
@@ -63,28 +63,28 @@ contract EchidnaProxy {
         uint _maxFee,
         bytes[] calldata priceFeedUpdateData
     ) external {
-        troveManager.redeemCollateral(_LUSDAmount, _firstRedemptionHint, _upperPartialRedemptionHint, _lowerPartialRedemptionHint, _partialRedemptionHintNICR, _maxIterations, _maxFee, priceFeedUpdateData);
+        troveManager.redeemCollateral(_USDSAmount, _firstRedemptionHint, _upperPartialRedemptionHint, _lowerPartialRedemptionHint, _partialRedemptionHintNICR, _maxIterations, _maxFee, priceFeedUpdateData);
     }
 
     // Borrower Operations
     function openTrovePrx(
-        uint _ETH, 
-        uint _LUSDAmount, 
+        uint _BNB, 
+        uint _USDSAmount, 
         address _upperHint, 
         address _lowerHint, 
         uint _maxFee,
         bytes[] calldata priceFeedUpdateData
     ) external payable {
-        borrowerOperations.openTrove{value: _ETH}(_maxFee, _LUSDAmount, _upperHint, _lowerHint, priceFeedUpdateData);
+        borrowerOperations.openTrove{value: _BNB}(_maxFee, _USDSAmount, _upperHint, _lowerHint, priceFeedUpdateData);
     }
 
     function addCollPrx(
-        uint _ETH, 
+        uint _BNB, 
         address _upperHint, 
         address _lowerHint,
         bytes[] calldata priceFeedUpdateData
     ) external payable {
-        borrowerOperations.addColl{value: _ETH}(_upperHint, _lowerHint, priceFeedUpdateData);
+        borrowerOperations.addColl{value: _BNB}(_upperHint, _lowerHint, priceFeedUpdateData);
     }
 
     function withdrawCollPrx(
@@ -96,23 +96,23 @@ contract EchidnaProxy {
         borrowerOperations.withdrawColl(_amount, _upperHint, _lowerHint, priceFeedUpdateData);
     }
 
-    function withdrawLUSDPrx(
+    function withdrawUSDSPrx(
         uint _amount, 
         address _upperHint, 
         address _lowerHint, 
         uint _maxFee,
         bytes[] calldata priceFeedUpdateData
     ) external {
-        borrowerOperations.withdrawLUSD(_maxFee, _amount, _upperHint, _lowerHint, priceFeedUpdateData);
+        borrowerOperations.withdrawUSDS(_maxFee, _amount, _upperHint, _lowerHint, priceFeedUpdateData);
     }
 
-    function repayLUSDPrx(
+    function repayUSDSPrx(
         uint _amount, 
         address _upperHint, 
         address _lowerHint,
         bytes[] calldata priceFeedUpdateData
     ) external {
-        borrowerOperations.repayLUSD(_amount, _upperHint, _lowerHint, priceFeedUpdateData);
+        borrowerOperations.repayUSDS(_amount, _upperHint, _lowerHint, priceFeedUpdateData);
     }
 
     function closeTrovePrx(bytes[] calldata priceFeedUpdateData) external {
@@ -120,11 +120,11 @@ contract EchidnaProxy {
     }
 
     function adjustTrovePrx(
-        uint _ETH, 
+        uint _BNB, 
         IBorrowerOperations.AdjustTroveParam memory adjustParam,
         bytes[] calldata priceFeedUpdateData
     ) external payable {
-        borrowerOperations.adjustTrove{value: _ETH}(adjustParam, priceFeedUpdateData);
+        borrowerOperations.adjustTrove{value: _BNB}(adjustParam, priceFeedUpdateData);
     }
 
     // Pool Manager
@@ -139,25 +139,25 @@ contract EchidnaProxy {
         stabilityPool.withdrawFromSP(_amount, priceFeedUpdateData);
     }
 
-    // LUSD Token
+    // USDS Token
 
     function transferPrx(address recipient, uint256 amount) external returns (bool) {
-        return lusdToken.transfer(recipient, amount);
+        return usdsToken.transfer(recipient, amount);
     }
 
     function approvePrx(address spender, uint256 amount) external returns (bool) {
-        return lusdToken.approve(spender, amount);
+        return usdsToken.approve(spender, amount);
     }
 
     function transferFromPrx(address sender, address recipient, uint256 amount) external returns (bool) {
-        return lusdToken.transferFrom(sender, recipient, amount);
+        return usdsToken.transferFrom(sender, recipient, amount);
     }
 
     function increaseAllowancePrx(address spender, uint256 addedValue) external returns (bool) {
-        return lusdToken.increaseAllowance(spender, addedValue);
+        return usdsToken.increaseAllowance(spender, addedValue);
     }
 
     function decreaseAllowancePrx(address spender, uint256 subtractedValue) external returns (bool) {
-        return lusdToken.decreaseAllowance(spender, subtractedValue);
+        return usdsToken.decreaseAllowance(spender, subtractedValue);
     }
 }

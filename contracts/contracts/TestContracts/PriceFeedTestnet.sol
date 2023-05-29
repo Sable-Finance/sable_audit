@@ -41,7 +41,6 @@ contract PriceFeedTestnet is IPriceFeed {
         address _stabilityPoolAddress
     )
         external
-        payable
     {
         troveManagerAddress = _troveManagerAddress;
         borrowerOperationsAddress = _borrowerOperationsAddress;
@@ -63,8 +62,6 @@ contract PriceFeedTestnet is IPriceFeed {
         // Fire an event just like the mainnet version would.
         // This lets the subgraph rely on events to get the latest price even when developing locally.
         emit LastGoodPriceUpdated(_price);
-        uint updateFee = mockPyth.getUpdateFee(priceFeedUpdateData);
-        mockPyth.updatePriceFeeds{value: updateFee}(priceFeedUpdateData);
 
         return _fetchPriceResult;
     }

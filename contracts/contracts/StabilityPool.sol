@@ -7,7 +7,7 @@ import "./Interfaces/IBorrowerOperations.sol";
 import "./Interfaces/IStabilityPool.sol";
 import "./Interfaces/IBorrowerOperations.sol";
 import "./Interfaces/ITroveManager.sol";
-import "./Interfaces/ILUSDToken.sol";
+import "./Interfaces/IUSDSToken.sol";
 import "./Interfaces/ISortedTroves.sol";
 import "./Interfaces/ICommunityIssuance.sol";
 import "./Dependencies/LiquityBase.sol";
@@ -16,21 +16,19 @@ import "./Dependencies/LiquitySafeMath128.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
-import "./TimeLock.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 /*
- * The Stability Pool holds LUSD tokens deposited by Stability Pool depositors.
+ * The Stability Pool holds USDS tokens deposited by Stability Pool depositors.
  *
- * When a trove is liquidated, then depending on system conditions, some of its LUSD debt gets offset with
- * LUSD in the Stability Pool:  that is, the offset debt evaporates, and an equal amount of LUSD tokens in the Stability Pool is burned.
+ * When a trove is liquidated, then depending on system conditions, some of its USDS debt gets offset with
+ * USDS in the Stability Pool:  that is, the offset debt evaporates, and an equal amount of USDS tokens in the Stability Pool is burned.
  *
- * Thus, a liquidation causes each depositor to receive a LUSD loss, in proportion to their deposit as a share of total deposits.
- * They also receive an ETH gain, as the ETH collateral of the liquidated trove is distributed among Stability depositors,
+ * Thus, a liquidation causes each depositor to receive a USDS loss, in proportion to their deposit as a share of total deposits.
+ * They also receive an BNB gain, as the BNB collateral of the liquidated trove is distributed among Stability depositors,
  * in the same proportion.
  *
  * When a liquidation occurs, it depletes every deposit by the same fraction: for example, a liquidation that depletes 40%
- * of the total LUSD in the Stability Pool, depletes 40% of each deposit.
+ * of the total USDS in the Stability Pool, depletes 40% of each deposit.
  *
  * A deposit that has experienced a series of liquidations is termed a "compounded deposit": each liquidation depletes the deposit,
  * multiplying it by some factor in range ]0,1[
@@ -38,25 +36,25 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
  *
  * --- IMPLEMENTATION ---
  *
- * We use a highly scalable method of tracking deposits and ETH gains that has O(1) complexity.
+ * We use a highly scalable method of tracking deposits and BNB gains that has O(1) complexity.
  *
- * When a liquidation occurs, rather than updating each depositor's deposit and ETH gain, we simply update two state variables:
+ * When a liquidation occurs, rather than updating each depositor's deposit and BNB gain, we simply update two state variables:
  * a product P, and a sum S.
  *
  * A mathematical manipulation allows us to factor out the initial deposit, and accurately track all depositors' compounded deposits
- * and accumulated ETH gains over time, as liquidations occur, using just these two variables P and S. When depositors join the
+ * and accumulated BNB gains over time, as liquidations occur, using just these two variables P and S. When depositors join the
  * Stability Pool, they get a snapshot of the latest P and S: P_t and S_t, respectively.
  *
- * The formula for a depositor's accumulated ETH gain is derived here:
+ * The formula for a depositor's accumulated BNB gain is derived here:
  * https://github.com/liquity/dev/blob/main/packages/contracts/mathProofs/Scalable%20Compounding%20Stability%20Pool%20Deposits.pdf
  *
  * For a given deposit d_t, the ratio P/P_t tells us the factor by which a deposit has decreased since it joined the Stability Pool,
- * and the term d_t * (S - S_t)/P_t gives us the deposit's total accumulated ETH gain.
+ * and the term d_t * (S - S_t)/P_t gives us the deposit's total accumulated BNB gain.
  *
- * Each liquidation updates the product P and sum S. After a series of liquidations, a compounded deposit and corresponding ETH gain
+ * Each liquidation updates the product P and sum S. After a series of liquidations, a compounded deposit and corresponding BNB gain
  * can be calculated using the initial deposit, the depositor’s snapshots of P and S, and the latest values of P and S.
  *
- * Any time a depositor updates their deposit (withdrawal, top-up) their accumulated ETH gain is paid out, their new deposit is recorded
+ * Any time a depositor updates their deposit (withdrawal, top-up) their accumulated BNB gain is paid out, their new deposit is recorded
  * (based on their latest compounded deposit and modified by the withdrawal/top-up), and they receive new snapshots of the latest P and S.
  * Essentially, they make a fresh deposit that overwrites the old one.
  *
@@ -92,16 +90,16 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
  *
  * Otherwise, we then compare the current scale to the deposit's scale snapshot. If they're equal, the compounded deposit is given by d_t * P/P_t.
  * If it spans one scale change, it is given by d_t * P/(P_t * 1e9). If it spans more than one scale change, we define the compounded deposit
- * as 0, since it is now less than 1e-9'th of its initial value (e.g. a deposit of 1 billion LUSD has depleted to < 1 LUSD).
+ * as 0, since it is now less than 1e-9'th of its initial value (e.g. a deposit of 1 billion USDS has depleted to < 1 USDS).
  *
  *
- *  --- TRACKING DEPOSITOR'S ETH GAIN OVER SCALE CHANGES AND EPOCHS ---
+ *  --- TRACKING DEPOSITOR'S BNB GAIN OVER SCALE CHANGES AND EPOCHS ---
  *
  * In the current epoch, the latest value of S is stored upon each scale change, and the mapping (scale -> S) is stored for each epoch.
  *
- * This allows us to calculate a deposit's accumulated ETH gain, during the epoch in which the deposit was non-zero and earned ETH.
+ * This allows us to calculate a deposit's accumulated BNB gain, during the epoch in which the deposit was non-zero and earned BNB.
  *
- * We calculate the depositor's accumulated ETH gain for the scale at which they made the deposit, using the ETH gain formula:
+ * We calculate the depositor's accumulated BNB gain for the scale at which they made the deposit, using the BNB gain formula:
  * e_1 = d_t * (S - S_t) / P_t
  *
  * and also for scale after, taking care to divide the latter by a factor of 1e9:
@@ -121,39 +119,35 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
  *  |---+---------|-------------|-----...
  *         i            i+1
  *
- * The sum of (e_1 + e_2) captures the depositor's total accumulated ETH gain, handling the case where their
+ * The sum of (e_1 + e_2) captures the depositor's total accumulated BNB gain, handling the case where their
  * deposit spanned one scale change. We only care about gains across one scale change, since the compounded
  * deposit is defined as being 0 once it has spanned more than one scale change.
  *
  *
  * --- UPDATING P WHEN A LIQUIDATION OCCURS ---
  *
- * Please see the implementation spec in the proof document, which closely follows on from the compounded deposit / ETH gain derivations:
+ * Please see the implementation spec in the proof document, which closely follows on from the compounded deposit / BNB gain derivations:
  * https://github.com/liquity/liquity/blob/master/papers/Scalable_Reward_Distribution_with_Compounding_Stakes.pdf
  *
  *
- * --- LQTY ISSUANCE TO STABILITY POOL DEPOSITORS ---
+ * --- SABLE ISSUANCE TO STABILITY POOL DEPOSITORS ---
  *
- * An LQTY issuance event occurs at every deposit operation, and every liquidation.
+ * An SABLE issuance event occurs at every deposit operation, and every liquidation.
  *
  * Each deposit is tagged with the address of the front end through which it was made.
  *
- * All deposits earn a share of the issued LQTY in proportion to the deposit as a share of total deposits. The LQTY earned
+ * All deposits earn a share of the issued SABLE in proportion to the deposit as a share of total deposits. The SABLE earned
  * by a given deposit, is split between the depositor and the front end through which the deposit was made, based on the front end's kickbackRate.
  *
  * Please see the system Readme for an overview:
  * https://github.com/liquity/dev/blob/main/README.md#lqty-issuance-to-stability-providers
  *
- * We use the same mathematical product-sum approach to track LQTY gains for depositors, where 'G' is the sum corresponding to LQTY gains.
+ * We use the same mathematical product-sum approach to track SABLE gains for depositors, where 'G' is the sum corresponding to SABLE gains.
  * The product P (and snapshot P_t) is re-used, as the ratio P/P_t tracks a deposit's depletion due to liquidations.
  *
  */
 contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     using LiquitySafeMath128 for uint128;
-    using EnumerableSet for EnumerableSet.AddressSet;
-
-    EnumerableSet.AddressSet private stakerSets;
-    EnumerableSet.AddressSet private fronEndSets;
 
     string public constant NAME = "StabilityPool";
 
@@ -161,19 +155,17 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     ITroveManager public troveManager;
 
-    ILUSDToken public lusdToken;
+    IUSDSToken public usdsToken;
 
     // Needed to check if there are pending liquidations
     ISortedTroves public sortedTroves;
 
     ICommunityIssuance public communityIssuance;
 
-    address internal timeLockAddress;
+    uint256 internal BNB; // deposited ether tracker
 
-    uint256 internal ETH; // deposited ether tracker
-
-    // Tracker for LUSD held in the pool. Changes when users deposit/withdraw, and when Trove debt is offset.
-    uint256 internal totalLUSDDeposits;
+    // Tracker for USDS held in the pool. Changes when users deposit/withdraw, and when Trove debt is offset.
+    uint256 internal totalUSDSDeposits;
 
     // --- Data structures ---
 
@@ -185,32 +177,25 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     struct Deposit {
         uint initialValue;
         address frontEndTag;
-        uint256 unpaidRewards; // The reward tokens quantity the user can harvest
-        uint256 rewardDebt; // The amount relative to accumulatedRewardsPerShare the user can't get as reward
-    }
-
-    struct FrontEndStake {
-        uint totalDeposits;
-        uint256 unpaidRewards; // The reward tokens quantity the user can harvest
-        uint256 rewardDebt; // The amount relative to accumulatedRewardsPerShare the user can't get as reward
     }
 
     struct Snapshots {
         uint S;
         uint P;
+        uint G;
         uint128 scale;
         uint128 epoch;
     }
 
-    mapping(address => Deposit) public deposits; // depositor address -> Staker struct
+    mapping(address => Deposit) public deposits; // depositor address -> Deposit struct
     mapping(address => Snapshots) public depositSnapshots; // depositor address -> snapshots struct
 
     mapping(address => FrontEnd) public frontEnds; // front end address -> FrontEnd struct
-    mapping(address => FrontEndStake) public frontEndStakes; // front end address -> FrontEndStake struct
+    mapping(address => uint) public frontEndStakes; // front end address -> last recorded total deposits, tagged with that front end
     mapping(address => Snapshots) public frontEndSnapshots; // front end address -> snapshots struct
 
     /*  Product 'P': Running product by which to multiply an initial deposit, in order to find the current compounded deposit,
-     * after a series of liquidations have occurred, each of which cancel some LUSD debt with the deposit.
+     * after a series of liquidations have occurred, each of which cancel some USDS debt with the deposit.
      *
      * During its lifetime, a deposit's value evolves from d_t to d_t * P / P_t , where P_t
      * is the snapshot of P taken at the instant the deposit was made. 18-digit decimal.
@@ -219,19 +204,13 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     uint public constant SCALE_FACTOR = 1e9;
 
-    uint256 private rewardTokensPerBlock; // Token reward per sec
-
-    uint256 private lastRewardedBlock; // Last time the user had their rewards calculated
-
-    uint256 private accumulatedRewardsPerShare = 0; // Accumulated rewards per share times REWARDS_PRECISION
-
     // Each time the scale of P shifts by SCALE_FACTOR, the scale is incremented by 1
     uint128 public currentScale;
 
     // With each offset that fully empties the Pool, the epoch is incremented by 1
     uint128 public currentEpoch;
 
-    /* ETH Gain sum 'S': During its lifetime, each deposit d_t earns an ETH gain of ( d_t * [S - S_t] )/P_t, where S_t
+    /* BNB Gain sum 'S': During its lifetime, each deposit d_t earns an BNB gain of ( d_t * [S - S_t] )/P_t, where S_t
      * is the depositor's snapshot of S taken at the time t when the deposit was made.
      *
      * The 'S' sums are stored in a nested mapping (epoch => scale => sum):
@@ -241,36 +220,47 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
      */
     mapping(uint128 => mapping(uint128 => uint)) public epochToScaleToSum;
 
-    // Error tracker for the error correction in the LQTY issuance calculation
-    uint public lastLQTYError;
+    /*
+     * Similarly, the sum 'G' is used to calculate SABLE gains. During it's lifetime, each deposit d_t earns a SABLE gain of
+     *  ( d_t * [G - G_t] )/P_t, where G_t is the depositor's snapshot of G taken at time t when  the deposit was made.
+     *
+     *  SABLE reward events occur are triggered by depositor operations (new deposit, topup, withdrawal), and liquidations.
+     *  In each case, the SABLE reward is issued (i.e. G is updated), before other state changes are made.
+     */
+    mapping(uint128 => mapping(uint128 => uint)) public epochToScaleToG;
+
+    // Error tracker for the error correction in the SABLE issuance calculation
+    uint public lastSABLEError;
     // Error trackers for the error correction in the offset calculation
-    uint public lastETHError_Offset;
-    uint public lastLUSDLossError_Offset;
+    uint public lastBNBError_Offset;
+    uint public lastUSDSLossError_Offset;
 
     // --- Events ---
 
-    event StabilityPoolETHBalanceUpdated(uint _newBalance);
-    event StabilityPoolLUSDBalanceUpdated(uint _newBalance);
+    event StabilityPoolBNBBalanceUpdated(uint _newBalance);
+    event StabilityPoolUSDSBalanceUpdated(uint _newBalance);
 
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
     event ActivePoolAddressChanged(address _newActivePoolAddress);
     event DefaultPoolAddressChanged(address _newDefaultPoolAddress);
-    event LUSDTokenAddressChanged(address _newLUSDTokenAddress);
+    event USDSTokenAddressChanged(address _newUSDSTokenAddress);
     event SortedTrovesAddressChanged(address _newSortedTrovesAddress);
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event CommunityIssuanceAddressChanged(address _newCommunityIssuanceAddress);
+    event SystemStateAddressChanged(address _newSystemStateAddress);
 
     event P_Updated(uint _P);
     event S_Updated(uint _S, uint128 _epoch, uint128 _scale);
+    event G_Updated(uint _G, uint128 _epoch, uint128 _scale);
     event EpochUpdated(uint128 _currentEpoch);
     event ScaleUpdated(uint128 _currentScale);
 
     event FrontEndRegistered(address indexed _frontEnd, uint _kickbackRate);
     event FrontEndTagSet(address indexed _depositor, address indexed _frontEnd);
 
-    event DepositSnapshotUpdated(address indexed _depositor, uint _P, uint _S);
-    event FrontEndSnapshotUpdated(address indexed _frontEnd, uint _P);
+    event DepositSnapshotUpdated(address indexed _depositor, uint _P, uint _S, uint _G);
+    event FrontEndSnapshotUpdated(address indexed _frontEnd, uint _P, uint _G);
     event UserDepositChanged(address indexed _depositor, uint _newDeposit);
     event FrontEndStakeChanged(
         address indexed _frontEnd,
@@ -278,11 +268,10 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         address _depositor
     );
 
-    event ETHGainWithdrawn(address indexed _depositor, uint _ETH, uint _LUSDLoss);
-    event LQTYPaidToDepositor(address indexed _depositor, uint _LQTY);
-    event LQTYPaidToFrontEnd(address indexed _frontEnd, uint _LQTY);
+    event BNBGainWithdrawn(address indexed _depositor, uint _BNB, uint _USDSLoss);
+    event SABLEPaidToDepositor(address indexed _depositor, uint _SABLE);
+    event SABLEPaidToFrontEnd(address indexed _frontEnd, uint _SABLE);
     event EtherSent(address _to, uint _amount);
-    event RewardsPerBlockChanged(uint _oldAmount, uint _amount);
 
     // --- Contract setters ---
 
@@ -290,66 +279,60 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
         address _activePoolAddress,
-        address _lusdTokenAddress,
+        address _usdsTokenAddress,
         address _sortedTrovesAddress,
         address _priceFeedAddress,
         address _communityIssuanceAddress,
-        address _systemStateAddress,
-        address _timeLockAddress,
-        uint256 _rewardPerBlocks
+        address _systemStateAddress
     ) external override onlyOwner {
         checkContract(_borrowerOperationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
-        checkContract(_lusdTokenAddress);
+        checkContract(_usdsTokenAddress);
         checkContract(_sortedTrovesAddress);
         checkContract(_priceFeedAddress);
         checkContract(_communityIssuanceAddress);
         checkContract(_systemStateAddress);
-        checkContract(_timeLockAddress);
 
         borrowerOperations = IBorrowerOperations(_borrowerOperationsAddress);
         troveManager = ITroveManager(_troveManagerAddress);
         activePool = IActivePool(_activePoolAddress);
-        lusdToken = ILUSDToken(_lusdTokenAddress);
+        usdsToken = IUSDSToken(_usdsTokenAddress);
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         priceFeed = IPriceFeed(_priceFeedAddress);
         communityIssuance = ICommunityIssuance(_communityIssuanceAddress);
         systemState = ISystemState(_systemStateAddress);
-        timeLockAddress = _timeLockAddress;
-
-        rewardTokensPerBlock = _rewardPerBlocks;
-        lastRewardedBlock = block.number;
 
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit ActivePoolAddressChanged(_activePoolAddress);
-        emit LUSDTokenAddressChanged(_lusdTokenAddress);
+        emit USDSTokenAddressChanged(_usdsTokenAddress);
         emit SortedTrovesAddressChanged(_sortedTrovesAddress);
         emit PriceFeedAddressChanged(_priceFeedAddress);
         emit CommunityIssuanceAddressChanged(_communityIssuanceAddress);
+        emit SystemStateAddressChanged(_systemStateAddress);
 
         _renounceOwnership();
     }
 
     // --- Getters for public variables. Required by IPool interface ---
 
-    function getETH() external view override returns (uint) {
-        return ETH;
+    function getBNB() external view override returns (uint) {
+        return BNB;
     }
 
-    function getTotalLUSDDeposits() external view override returns (uint) {
-        return totalLUSDDeposits;
+    function getTotalUSDSDeposits() external view override returns (uint) {
+        return totalUSDSDeposits;
     }
 
     // --- External Depositor Functions ---
 
     /*  provideToSP():
      *
-     * - Triggers a LQTY issuance, based on time passed since the last issuance. The LQTY issuance is shared between *all* depositors and front ends
+     * - Triggers a SABLE issuance, based on time passed since the last issuance. The SABLE issuance is shared between *all* depositors and front ends
      * - Tags the deposit with the provided front end tag param, if it's a new deposit
-     * - Sends depositor's accumulated gains (LQTY, ETH) to depositor
-     * - Sends the tagged front end's accumulated LQTY gains to the tagged front end
+     * - Sends depositor's accumulated gains (SABLE, BNB) to depositor
+     * - Sends the tagged front end's accumulated SABLE gains to the tagged front end
      * - Increases deposit and tagged front end's stake, and takes new snapshots for each.
      */
     function provideToSP(uint _amount, address _frontEndTag) external override {
@@ -361,51 +344,47 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
         ICommunityIssuance communityIssuanceCached = communityIssuance;
 
+        _triggerSABLEIssuance(communityIssuanceCached);
+
         if (initialDeposit == 0) {
             _setFrontEndTag(msg.sender, _frontEndTag);
         }
-        uint depositorETHGain = getDepositorETHGain(msg.sender);
-        uint compoundedLUSDDeposit = getCompoundedLUSDDeposit(msg.sender);
-        uint LUSDLoss = initialDeposit.sub(compoundedLUSDDeposit); // Needed only for event log
+        uint depositorBNBGain = getDepositorBNBGain(msg.sender);
+        uint compoundedUSDSDeposit = getCompoundedUSDSDeposit(msg.sender);
+        uint USDSLoss = initialDeposit.sub(compoundedUSDSDeposit); // Needed only for event log
 
-        // First pay out any LQTY gains
+        // First pay out any SABLE gains
         address frontEnd = deposits[msg.sender].frontEndTag;
+        _payOutSABLEGains(communityIssuanceCached, msg.sender, frontEnd);
 
         // Update front end stake
         uint compoundedFrontEndStake = getCompoundedFrontEndStake(frontEnd);
         uint newFrontEndStake = compoundedFrontEndStake.add(_amount);
-
-        _payOutLQTYGainsDepositor(communityIssuanceCached, msg.sender, compoundedLUSDDeposit);
-        _payOutLQTYGainsFrontEnd(communityIssuanceCached, frontEnd, compoundedFrontEndStake);
         _updateFrontEndStakeAndSnapshots(frontEnd, newFrontEndStake);
         emit FrontEndStakeChanged(frontEnd, newFrontEndStake, msg.sender);
 
-        _sendLUSDtoStabilityPool(msg.sender, _amount);
+        _sendUSDStoStabilityPool(msg.sender, _amount);
 
-        uint newDeposit = compoundedLUSDDeposit.add(_amount);
+        uint newDeposit = compoundedUSDSDeposit.add(_amount);
         _updateDepositAndSnapshots(msg.sender, newDeposit);
-        _updateRewardDebt(msg.sender, frontEnd);
         emit UserDepositChanged(msg.sender, newDeposit);
 
-        emit ETHGainWithdrawn(msg.sender, depositorETHGain, LUSDLoss); // LUSD Loss required for event log
+        emit BNBGainWithdrawn(msg.sender, depositorBNBGain, USDSLoss); // USDS Loss required for event log
 
-        _sendETHGainToDepositor(depositorETHGain);
+        _sendBNBGainToDepositor(depositorBNBGain);
     }
 
     /*  withdrawFromSP():
      *
-     * - Triggers a LQTY issuance, based on time passed since the last issuance. The LQTY issuance is shared between *all* depositors and front ends
+     * - Triggers a SABLE issuance, based on time passed since the last issuance. The SABLE issuance is shared between *all* depositors and front ends
      * - Removes the deposit's front end tag if it is a full withdrawal
-     * - Sends all depositor's accumulated gains (LQTY, ETH) to depositor
-     * - Sends the tagged front end's accumulated LQTY gains to the tagged front end
+     * - Sends all depositor's accumulated gains (SABLE, BNB) to depositor
+     * - Sends the tagged front end's accumulated SABLE gains to the tagged front end
      * - Decreases deposit and tagged front end's stake, and takes new snapshots for each.
      *
      * If _amount > userDeposit, the user withdraws all of their compounded deposit.
      */
-    function withdrawFromSP(
-        uint _amount,
-        bytes[] calldata priceFeedUpdateData
-    ) external override {
+    function withdrawFromSP(uint _amount, bytes[] calldata priceFeedUpdateData) external override {
         if (_amount != 0) {
             _requireNoUnderCollateralizedTroves(priceFeedUpdateData);
         }
@@ -414,54 +393,49 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
         ICommunityIssuance communityIssuanceCached = communityIssuance;
 
-        uint depositorETHGain = getDepositorETHGain(msg.sender);
+        _triggerSABLEIssuance(communityIssuanceCached);
 
-        uint compoundedLUSDDeposit = getCompoundedLUSDDeposit(msg.sender);
-        uint LUSDtoWithdraw = LiquityMath._min(_amount, compoundedLUSDDeposit);
-        uint LUSDLoss = initialDeposit.sub(compoundedLUSDDeposit); // Needed only for event log
+        uint depositorBNBGain = getDepositorBNBGain(msg.sender);
 
-        // First pay out any LQTY gains
+        uint compoundedUSDSDeposit = getCompoundedUSDSDeposit(msg.sender);
+        uint USDStoWithdraw = LiquityMath._min(_amount, compoundedUSDSDeposit);
+        uint USDSLoss = initialDeposit.sub(compoundedUSDSDeposit); // Needed only for event log
+
+        // First pay out any SABLE gains
         address frontEnd = deposits[msg.sender].frontEndTag;
+        _payOutSABLEGains(communityIssuanceCached, msg.sender, frontEnd);
 
         // Update front end stake
         uint compoundedFrontEndStake = getCompoundedFrontEndStake(frontEnd);
-
-        _payOutLQTYGainsDepositor(communityIssuanceCached, msg.sender, compoundedLUSDDeposit);
-        _payOutLQTYGainsFrontEnd(communityIssuanceCached, frontEnd, compoundedFrontEndStake);
-        uint newFrontEndStake = compoundedFrontEndStake.sub(LUSDtoWithdraw);
+        uint newFrontEndStake = compoundedFrontEndStake.sub(USDStoWithdraw);
         _updateFrontEndStakeAndSnapshots(frontEnd, newFrontEndStake);
         emit FrontEndStakeChanged(frontEnd, newFrontEndStake, msg.sender);
 
-        _sendLUSDToDepositor(msg.sender, LUSDtoWithdraw);
+        _sendUSDSToDepositor(msg.sender, USDStoWithdraw);
 
         // Update deposit
-        uint newDeposit = compoundedLUSDDeposit.sub(LUSDtoWithdraw);
+        uint newDeposit = compoundedUSDSDeposit.sub(USDStoWithdraw);
         _updateDepositAndSnapshots(msg.sender, newDeposit);
-        _updateRewardDebt(msg.sender, frontEnd);
         emit UserDepositChanged(msg.sender, newDeposit);
 
-        emit ETHGainWithdrawn(msg.sender, depositorETHGain, LUSDLoss); // LUSD Loss required for event log
+        emit BNBGainWithdrawn(msg.sender, depositorBNBGain, USDSLoss); // USDS Loss required for event log
 
-        _sendETHGainToDepositor(depositorETHGain);
+        _sendBNBGainToDepositor(depositorBNBGain);
     }
 
-    // Set token reward per second from time lock
-    function setRewardsPerBlock(uint _amount) external {
-        _requireCallerIsTimeLock();
-        updatePoolRewards();
-        uint oldReward = rewardTokensPerBlock;
-        rewardTokensPerBlock = _amount;
-        emit RewardsPerBlockChanged(oldReward, _amount);
+    function ownerTriggerIssuance() external override {
+        _requireCallerIsCommunityIssuance();
+        _triggerSABLEIssuance(communityIssuance);
     }
 
-    /* withdrawETHGainToTrove:
-     * - Triggers a LQTY issuance, based on time passed since the last issuance. The LQTY issuance is shared between *all* depositors and front ends
-     * - Sends all depositor's LQTY gain to  depositor
-     * - Sends all tagged front end's LQTY gain to the tagged front end
-     * - Transfers the depositor's entire ETH gain from the Stability Pool to the caller's trove
+    /* withdrawBNBGainToTrove:
+     * - Triggers a SABLE issuance, based on time passed since the last issuance. The SABLE issuance is shared between *all* depositors and front ends
+     * - Sends all depositor's SABLE gain to  depositor
+     * - Sends all tagged front end's SABLE gain to the tagged front end
+     * - Transfers the depositor's entire BNB gain from the Stability Pool to the caller's trove
      * - Leaves their compounded deposit in the Stability Pool
      * - Updates snapshots for deposit and tagged front end stake */
-    function withdrawETHGainToTrove(
+    function withdrawBNBGainToTrove(
         address _upperHint,
         address _lowerHint,
         bytes[] calldata priceFeedUpdateData
@@ -469,40 +443,40 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         uint initialDeposit = deposits[msg.sender].initialValue;
         _requireUserHasDeposit(initialDeposit);
         _requireUserHasTrove(msg.sender);
-        _requireUserHasETHGain(msg.sender);
+        _requireUserHasBNBGain(msg.sender);
 
         ICommunityIssuance communityIssuanceCached = communityIssuance;
 
-        uint depositorETHGain = getDepositorETHGain(msg.sender);
+        _triggerSABLEIssuance(communityIssuanceCached);
 
-        uint compoundedLUSDDeposit = getCompoundedLUSDDeposit(msg.sender);
-        uint LUSDLoss = initialDeposit.sub(compoundedLUSDDeposit); // Needed only for event log
+        uint depositorBNBGain = getDepositorBNBGain(msg.sender);
 
-        // First pay out any LQTY gains
+        uint compoundedUSDSDeposit = getCompoundedUSDSDeposit(msg.sender);
+        uint USDSLoss = initialDeposit.sub(compoundedUSDSDeposit); // Needed only for event log
+
+        // First pay out any SABLE gains
         address frontEnd = deposits[msg.sender].frontEndTag;
-        uint compoundedFrontEndStake = getCompoundedFrontEndStake(frontEnd);
-        _payOutLQTYGainsDepositor(communityIssuanceCached, msg.sender, compoundedLUSDDeposit);
+        _payOutSABLEGains(communityIssuanceCached, msg.sender, frontEnd);
 
         // Update front end stake
-        _payOutLQTYGainsFrontEnd(communityIssuanceCached, frontEnd, compoundedFrontEndStake);
-
+        uint compoundedFrontEndStake = getCompoundedFrontEndStake(frontEnd);
         uint newFrontEndStake = compoundedFrontEndStake;
         _updateFrontEndStakeAndSnapshots(frontEnd, newFrontEndStake);
         emit FrontEndStakeChanged(frontEnd, newFrontEndStake, msg.sender);
-        _updateDepositAndSnapshots(msg.sender, compoundedLUSDDeposit);
-        _updateRewardDebt(msg.sender, frontEnd);
 
-        /* Emit events before transferring ETH gain to Trove.
-         This lets the event log make more sense (i.e. so it appears that first the ETH gain is withdrawn
+        _updateDepositAndSnapshots(msg.sender, compoundedUSDSDeposit);
+
+        /* Emit events before transferring BNB gain to Trove.
+         This lets the event log make more sense (i.e. so it appears that first the BNB gain is withdrawn
         and then it is deposited into the Trove, not the other way around). */
-        emit ETHGainWithdrawn(msg.sender, depositorETHGain, LUSDLoss);
-        emit UserDepositChanged(msg.sender, compoundedLUSDDeposit);
+        emit BNBGainWithdrawn(msg.sender, depositorBNBGain, USDSLoss);
+        emit UserDepositChanged(msg.sender, compoundedUSDSDeposit);
 
-        ETH = ETH.sub(depositorETHGain);
-        emit StabilityPoolETHBalanceUpdated(ETH);
-        emit EtherSent(msg.sender, depositorETHGain);
+        BNB = BNB.sub(depositorBNBGain);
+        emit StabilityPoolBNBBalanceUpdated(BNB);
+        emit EtherSent(msg.sender, depositorBNBGain);
 
-        borrowerOperations.moveETHGainToTrove{value: depositorETHGain}(
+        borrowerOperations.moveBNBGainToTrove{value: depositorBNBGain}(
             msg.sender,
             _upperHint,
             _lowerHint,
@@ -510,27 +484,81 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         );
     }
 
+    // --- SABLE issuance functions ---
+
+    function _triggerSABLEIssuance(ICommunityIssuance _communityIssuance) internal {
+        uint SABLEIssuance = _communityIssuance.issueSABLE();
+        _updateG(SABLEIssuance);
+    }
+
+    function _updateG(uint _SABLEIssuance) internal {
+        uint totalUSDS = totalUSDSDeposits; // cached to save an SLOAD
+        /*
+         * When total deposits is 0, G is not updated. In this case, the SABLE issued can not be obtained by later
+         * depositors - it is missed out on, and remains in the balanceof the CommunityIssuance contract.
+         *
+         */
+        if (totalUSDS == 0 || _SABLEIssuance == 0) {
+            return;
+        }
+
+        uint SABLEPerUnitStaked;
+        SABLEPerUnitStaked = _computeSABLEPerUnitStaked(_SABLEIssuance, totalUSDS);
+
+        uint marginalSABLEGain = SABLEPerUnitStaked.mul(P);
+        epochToScaleToG[currentEpoch][currentScale] = epochToScaleToG[currentEpoch][currentScale]
+            .add(marginalSABLEGain);
+
+        emit G_Updated(epochToScaleToG[currentEpoch][currentScale], currentEpoch, currentScale);
+    }
+
+    function _computeSABLEPerUnitStaked(
+        uint _SABLEIssuance,
+        uint _totalUSDSDeposits
+    ) internal returns (uint) {
+        /*
+         * Calculate the SABLE-per-unit staked.  Division uses a "feedback" error correction, to keep the
+         * cumulative error low in the running total G:
+         *
+         * 1) Form a numerator which compensates for the floor division error that occurred the last time this
+         * function was called.
+         * 2) Calculate "per-unit-staked" ratio.
+         * 3) Multiply the ratio back by its denominator, to reveal the current floor division error.
+         * 4) Store this error for use in the next correction when this function is called.
+         * 5) Note: static analysis tools complain about this "division before multiplication", however, it is intended.
+         */
+        uint SABLENumerator = _SABLEIssuance.mul(DECIMAL_PRECISION).add(lastSABLEError);
+
+        uint SABLEPerUnitStaked = SABLENumerator.div(_totalUSDSDeposits);
+        lastSABLEError = SABLENumerator.sub(SABLEPerUnitStaked.mul(_totalUSDSDeposits));
+
+        return SABLEPerUnitStaked;
+    }
+
     // --- Liquidation functions ---
 
     /*
-     * Cancels out the specified debt against the LUSD contained in the Stability Pool (as far as possible)
-     * and transfers the Trove's ETH collateral from ActivePool to StabilityPool.
+     * Cancels out the specified debt against the USDS contained in the Stability Pool (as far as possible)
+     * and transfers the Trove's BNB collateral from ActivePool to StabilityPool.
      * Only called by liquidation functions in the TroveManager.
      */
     function offset(uint _debtToOffset, uint _collToAdd) external override {
         _requireCallerIsTroveManager();
-        uint totalLUSD = totalLUSDDeposits; // cached to save an SLOAD
-        if (totalLUSD == 0 || _debtToOffset == 0) {
+        uint totalUSDS = totalUSDSDeposits; // cached to save an SLOAD
+        if (totalUSDS == 0 || _debtToOffset == 0) {
             return;
         }
 
-        (uint ETHGainPerUnitStaked, uint LUSDLossPerUnitStaked) = _computeRewardsPerUnitStaked(
+        _triggerSABLEIssuance(communityIssuance);
+
+        (uint BNBGainPerUnitStaked, uint USDSLossPerUnitStaked) = _computeRewardsPerUnitStaked(
             _collToAdd,
             _debtToOffset,
-            totalLUSD
+            totalUSDS
         );
-        _resetAccPerShareAndPayOutProfit();
-        _updateRewardSumAndProduct(ETHGainPerUnitStaked, LUSDLossPerUnitStaked); // updates S and P
+
+        _updateRewardSumAndProduct(BNBGainPerUnitStaked, USDSLossPerUnitStaked); // updates S and P
+
         _moveOffsetCollAndDebt(_collToAdd, _debtToOffset);
     }
 
@@ -539,10 +567,10 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     function _computeRewardsPerUnitStaked(
         uint _collToAdd,
         uint _debtToOffset,
-        uint _totalLUSDDeposits
-    ) internal returns (uint ETHGainPerUnitStaked, uint LUSDLossPerUnitStaked) {
+        uint _totalUSDSDeposits
+    ) internal returns (uint BNBGainPerUnitStaked, uint USDSLossPerUnitStaked) {
         /*
-         * Compute the LUSD and ETH rewards. Uses a "feedback" error correction, to keep
+         * Compute the USDS and BNB rewards. Uses a "feedback" error correction, to keep
          * the cumulative error in the P and S state variables low:
          *
          * 1) Form numerators which compensate for the floor division errors that occurred the last time this
@@ -552,46 +580,46 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
          * 4) Store these errors for use in the next correction when this function is called.
          * 5) Note: static analysis tools complain about this "division before multiplication", however, it is intended.
          */
-        uint ETHNumerator = _collToAdd.mul(DECIMAL_PRECISION).add(lastETHError_Offset);
+        uint BNBNumerator = _collToAdd.mul(DECIMAL_PRECISION).add(lastBNBError_Offset);
 
-        assert(_debtToOffset <= _totalLUSDDeposits);
-        if (_debtToOffset == _totalLUSDDeposits) {
-            LUSDLossPerUnitStaked = DECIMAL_PRECISION; // When the Pool depletes to 0, so does each deposit
-            lastLUSDLossError_Offset = 0;
+        assert(_debtToOffset <= _totalUSDSDeposits);
+        if (_debtToOffset == _totalUSDSDeposits) {
+            USDSLossPerUnitStaked = DECIMAL_PRECISION; // When the Pool depletes to 0, so does each deposit
+            lastUSDSLossError_Offset = 0;
         } else {
-            uint LUSDLossNumerator = _debtToOffset.mul(DECIMAL_PRECISION).sub(
-                lastLUSDLossError_Offset
+            uint USDSLossNumerator = _debtToOffset.mul(DECIMAL_PRECISION).sub(
+                lastUSDSLossError_Offset
             );
             /*
-             * Add 1 to make error in quotient positive. We want "slightly too much" LUSD loss,
-             * which ensures the error in any given compoundedLUSDDeposit favors the Stability Pool.
+             * Add 1 to make error in quotient positive. We want "slightly too much" USDS loss,
+             * which ensures the error in any given compoundedUSDSDeposit favors the Stability Pool.
              */
-            LUSDLossPerUnitStaked = (LUSDLossNumerator.div(_totalLUSDDeposits)).add(1);
-            lastLUSDLossError_Offset = (LUSDLossPerUnitStaked.mul(_totalLUSDDeposits)).sub(
-                LUSDLossNumerator
+            USDSLossPerUnitStaked = (USDSLossNumerator.div(_totalUSDSDeposits)).add(1);
+            lastUSDSLossError_Offset = (USDSLossPerUnitStaked.mul(_totalUSDSDeposits)).sub(
+                USDSLossNumerator
             );
         }
 
-        ETHGainPerUnitStaked = ETHNumerator.div(_totalLUSDDeposits);
-        lastETHError_Offset = ETHNumerator.sub(ETHGainPerUnitStaked.mul(_totalLUSDDeposits));
+        BNBGainPerUnitStaked = BNBNumerator.div(_totalUSDSDeposits);
+        lastBNBError_Offset = BNBNumerator.sub(BNBGainPerUnitStaked.mul(_totalUSDSDeposits));
 
-        return (ETHGainPerUnitStaked, LUSDLossPerUnitStaked);
+        return (BNBGainPerUnitStaked, USDSLossPerUnitStaked);
     }
 
     // Update the Stability Pool reward sum S and product P
     function _updateRewardSumAndProduct(
-        uint _ETHGainPerUnitStaked,
-        uint _LUSDLossPerUnitStaked
+        uint _BNBGainPerUnitStaked,
+        uint _USDSLossPerUnitStaked
     ) internal {
         uint currentP = P;
         uint newP;
 
-        assert(_LUSDLossPerUnitStaked <= DECIMAL_PRECISION);
+        assert(_USDSLossPerUnitStaked <= DECIMAL_PRECISION);
         /*
-         * The newProductFactor is the factor by which to change all deposits, due to the depletion of Stability Pool LUSD in the liquidation.
-         * We make the product factor 0 if there was a pool-emptying. Otherwise, it is (1 - LUSDLossPerUnitStaked)
+         * The newProductFactor is the factor by which to change all deposits, due to the depletion of Stability Pool USDS in the liquidation.
+         * We make the product factor 0 if there was a pool-emptying. Otherwise, it is (1 - USDSLossPerUnitStaked)
          */
-        uint newProductFactor = uint(DECIMAL_PRECISION).sub(_LUSDLossPerUnitStaked);
+        uint newProductFactor = uint(DECIMAL_PRECISION).sub(_USDSLossPerUnitStaked);
 
         uint128 currentScaleCached = currentScale;
         uint128 currentEpochCached = currentEpoch;
@@ -599,13 +627,13 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
         /*
          * Calculate the new S first, before we update P.
-         * The ETH gain for any given depositor from a liquidation depends on the value of their deposit
+         * The BNB gain for any given depositor from a liquidation depends on the value of their deposit
          * (and the value of totalDeposits) prior to the Stability being depleted by the debt in the liquidation.
          *
-         * Since S corresponds to ETH gain, and P to deposit loss, we update S first.
+         * Since S corresponds to BNB gain, and P to deposit loss, we update S first.
          */
-        uint marginalETHGain = _ETHGainPerUnitStaked.mul(currentP);
-        uint newS = currentS.add(marginalETHGain);
+        uint marginalBNBGain = _BNBGainPerUnitStaked.mul(currentP);
+        uint newS = currentS.add(marginalBNBGain);
         epochToScaleToSum[currentEpochCached][currentScaleCached] = newS;
         emit S_Updated(newS, currentEpochCached, currentScaleCached);
 
@@ -626,7 +654,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
             newP = currentP.mul(newProductFactor).div(DECIMAL_PRECISION);
         }
 
-        assert(newP > 0);
+        require(newP > 0);
         P = newP;
 
         emit P_Updated(newP);
@@ -635,30 +663,30 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     function _moveOffsetCollAndDebt(uint _collToAdd, uint _debtToOffset) internal {
         IActivePool activePoolCached = activePool;
 
-        // Cancel the liquidated LUSD debt with the LUSD in the stability pool
-        activePoolCached.decreaseLUSDDebt(_debtToOffset);
-        _decreaseLUSD(_debtToOffset);
+        // Cancel the liquidated USDS debt with the USDS in the stability pool
+        activePoolCached.decreaseUSDSDebt(_debtToOffset);
+        _decreaseUSDS(_debtToOffset);
 
         // Burn the debt that was successfully offset
-        lusdToken.burn(address(this), _debtToOffset);
+        usdsToken.burn(address(this), _debtToOffset);
 
-        activePoolCached.sendETH(address(this), _collToAdd);
+        activePoolCached.sendBNB(address(this), _collToAdd);
     }
 
-    function _decreaseLUSD(uint _amount) internal {
-        uint newTotalLUSDDeposits = totalLUSDDeposits.sub(_amount);
-        totalLUSDDeposits = newTotalLUSDDeposits;
-        emit StabilityPoolLUSDBalanceUpdated(newTotalLUSDDeposits);
+    function _decreaseUSDS(uint _amount) internal {
+        uint newTotalUSDSDeposits = totalUSDSDeposits.sub(_amount);
+        totalUSDSDeposits = newTotalUSDSDeposits;
+        emit StabilityPoolUSDSBalanceUpdated(newTotalUSDSDeposits);
     }
 
     // --- Reward calculator functions for depositor and front end ---
 
-    /* Calculates the ETH gain earned by the deposit since its last snapshots were taken.
+    /* Calculates the BNB gain earned by the deposit since its last snapshots were taken.
      * Given by the formula:  E = d0 * (S - S(0))/P(0)
      * where S(0) and P(0) are the depositor's snapshots of the sum S and product P, respectively.
      * d0 is the last recorded deposit value.
      */
-    function getDepositorETHGain(address _depositor) public view override returns (uint) {
+    function getDepositorBNBGain(address _depositor) public view override returns (uint) {
         uint initialDeposit = deposits[_depositor].initialValue;
 
         if (initialDeposit == 0) {
@@ -667,17 +695,17 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
         Snapshots memory snapshots = depositSnapshots[_depositor];
 
-        uint ETHGain = _getETHGainFromSnapshots(initialDeposit, snapshots);
-        return ETHGain;
+        uint BNBGain = _getBNBGainFromSnapshots(initialDeposit, snapshots);
+        return BNBGain;
     }
 
-    function _getETHGainFromSnapshots(
+    function _getBNBGainFromSnapshots(
         uint initialDeposit,
         Snapshots memory snapshots
     ) internal view returns (uint) {
         /*
-         * Grab the sum 'S' from the epoch at which the stake was made. The ETH gain may span up to one scale change.
-         * If it does, the second portion of the ETH gain is scaled by 1e9.
+         * Grab the sum 'S' from the epoch at which the stake was made. The BNB gain may span up to one scale change.
+         * If it does, the second portion of the BNB gain is scaled by 1e9.
          * If the gain spans no scale change, the second portion will be 0.
          */
         uint128 epochSnapshot = snapshots.epoch;
@@ -690,83 +718,90 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
             SCALE_FACTOR
         );
 
-        uint ETHGain = initialDeposit.mul(firstPortion.add(secondPortion)).div(P_Snapshot).div(
+        uint BNBGain = initialDeposit.mul(firstPortion.add(secondPortion)).div(P_Snapshot).div(
             DECIMAL_PRECISION
         );
 
-        return ETHGain;
+        return BNBGain;
     }
 
     /*
-     * Calculate the LQTY gain earned by a deposit since its last snapshots were taken.
-     * Given by the formula:  LQTY = d0 * (G - G(0))/P(0)
+     * Calculate the SABLE gain earned by a deposit since its last snapshots were taken.
+     * Given by the formula:  SABLE = d0 * (G - G(0))/P(0)
      * where G(0) and P(0) are the depositor's snapshots of the sum G and product P, respectively.
      * d0 is the last recorded deposit value.
      */
-    function getDepositorLQTYGain(address _depositor) public view override returns (uint) {
-        Deposit storage deposit = deposits[_depositor];
-        uint256 accTokenPerShare = accumulatedRewardsPerShare;
-
-        if (block.number > lastRewardedBlock && totalLUSDDeposits != 0) {
-            uint256 timeElapsed = block.number.sub(lastRewardedBlock);
-            uint256 tokenReward = timeElapsed.mul(rewardTokensPerBlock);
-            accTokenPerShare = accTokenPerShare.add(
-                tokenReward.mul(DECIMAL_PRECISION).div(totalLUSDDeposits)
-            );
+    function getDepositorSABLEGain(address _depositor) public view override returns (uint) {
+        uint initialDeposit = deposits[_depositor].initialValue;
+        if (initialDeposit == 0) {
+            return 0;
         }
-        uint compoundedLUSDDeposit = getCompoundedLUSDDeposit(_depositor);
+
         address frontEndTag = deposits[_depositor].frontEndTag;
-
-        uint kickbackRate = frontEndTag == address(0)
-            ? DECIMAL_PRECISION
-            : frontEnds[frontEndTag].kickbackRate;
-
-        uint pending = kickbackRate
-            .mul(compoundedLUSDDeposit.mul(accTokenPerShare) / DECIMAL_PRECISION)
-            .sub(deposit.rewardDebt)
-            .div(DECIMAL_PRECISION)
-            .add(deposit.unpaidRewards);
-        return pending;
-    }
-
-    /*
-     * Return the LQTY gain earned by the front end. Given by the formula:  E = D0 * (G - G(0))/P(0)
-     * where G(0) and P(0) are the depositor's snapshots of the sum G and product P, respectively.
-     *
-     * D0 is the last recorded value of the front end's total tagged deposits.
-     */
-    function getFrontEndLQTYGain(address _frontEnd) public view override returns (uint) {
-        FrontEndStake memory frontEnd = frontEndStakes[_frontEnd];
-        uint256 accTokenPerShare = accumulatedRewardsPerShare;
-
-        if (block.number > lastRewardedBlock && totalLUSDDeposits != 0) {
-            uint256 timeElapsed = block.number.sub(lastRewardedBlock);
-            uint256 tokenReward = timeElapsed.mul(rewardTokensPerBlock);
-            accTokenPerShare = accTokenPerShare.add(
-                tokenReward.mul(DECIMAL_PRECISION).div(totalLUSDDeposits)
-            );
-        }
-
-        uint compoundedFrontEndStake = getCompoundedFrontEndStake(_frontEnd);
-        uint kickbackRate = frontEnds[_frontEnd].kickbackRate;
 
         /*
          * If not tagged with a front end, the depositor gets a 100% cut of what their deposit earned.
          * Otherwise, their cut of the deposit's earnings is equal to the kickbackRate, set by the front end through
          * which they made their deposit.
          */
-        uint frontEndShare = uint(DECIMAL_PRECISION).sub(kickbackRate);
+        uint kickbackRate = frontEndTag == address(0)
+            ? DECIMAL_PRECISION
+            : frontEnds[frontEndTag].kickbackRate;
 
-        uint pending = frontEndShare
-            .mul(compoundedFrontEndStake.mul(accTokenPerShare) / DECIMAL_PRECISION)
-            .sub(frontEnd.rewardDebt)
-            .div(DECIMAL_PRECISION)
-            .add(frontEnd.unpaidRewards);
-        return pending;
+        Snapshots memory snapshots = depositSnapshots[_depositor];
+
+        uint SABLEGain = kickbackRate.mul(_getSABLEGainFromSnapshots(initialDeposit, snapshots)).div(
+            DECIMAL_PRECISION
+        );
+
+        return SABLEGain;
     }
 
-    function getRewarsPerBlock() external view returns (uint) {
-        return rewardTokensPerBlock;
+    /*
+     * Return the SABLE gain earned by the front end. Given by the formula:  E = D0 * (G - G(0))/P(0)
+     * where G(0) and P(0) are the depositor's snapshots of the sum G and product P, respectively.
+     *
+     * D0 is the last recorded value of the front end's total tagged deposits.
+     */
+    function getFrontEndSABLEGain(address _frontEnd) public view override returns (uint) {
+        uint frontEndStake = frontEndStakes[_frontEnd];
+        if (frontEndStake == 0) {
+            return 0;
+        }
+
+        uint kickbackRate = frontEnds[_frontEnd].kickbackRate;
+        uint frontEndShare = uint(DECIMAL_PRECISION).sub(kickbackRate);
+
+        Snapshots memory snapshots = frontEndSnapshots[_frontEnd];
+
+        uint SABLEGain = frontEndShare.mul(_getSABLEGainFromSnapshots(frontEndStake, snapshots)).div(
+            DECIMAL_PRECISION
+        );
+        return SABLEGain;
+    }
+
+    function _getSABLEGainFromSnapshots(
+        uint initialStake,
+        Snapshots memory snapshots
+    ) internal view returns (uint) {
+        /*
+         * Grab the sum 'G' from the epoch at which the stake was made. The SABLE gain may span up to one scale change.
+         * If it does, the second portion of the SABLE gain is scaled by 1e9.
+         * If the gain spans no scale change, the second portion will be 0.
+         */
+        uint128 epochSnapshot = snapshots.epoch;
+        uint128 scaleSnapshot = snapshots.scale;
+        uint G_Snapshot = snapshots.G;
+        uint P_Snapshot = snapshots.P;
+
+        uint firstPortion = epochToScaleToG[epochSnapshot][scaleSnapshot].sub(G_Snapshot);
+        uint secondPortion = epochToScaleToG[epochSnapshot][scaleSnapshot.add(1)].div(SCALE_FACTOR);
+
+        uint SABLEGain = initialStake.mul(firstPortion.add(secondPortion)).div(P_Snapshot).div(
+            DECIMAL_PRECISION
+        );
+
+        return SABLEGain;
     }
 
     // --- Compounded deposit and compounded front end stake ---
@@ -775,7 +810,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
      * Return the user's compounded deposit. Given by the formula:  d = d0 * P/P(0)
      * where P(0) is the depositor's snapshot of the product P, taken when they last updated their deposit.
      */
-    function getCompoundedLUSDDeposit(address _depositor) public view override returns (uint) {
+    function getCompoundedUSDSDeposit(address _depositor) public view override returns (uint) {
         uint initialDeposit = deposits[_depositor].initialValue;
         if (initialDeposit == 0) {
             return 0;
@@ -795,7 +830,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
      * The front end's compounded stake is equal to the sum of its depositors' compounded deposits.
      */
     function getCompoundedFrontEndStake(address _frontEnd) public view override returns (uint) {
-        uint frontEndStake = frontEndStakes[_frontEnd].totalDeposits;
+        uint frontEndStake = frontEndStakes[_frontEnd];
         if (frontEndStake == 0) {
             return 0;
         }
@@ -852,37 +887,37 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         return compoundedStake;
     }
 
-    // --- Sender functions for LUSD deposit, ETH gains and LQTY gains ---
+    // --- Sender functions for USDS deposit, BNB gains and SABLE gains ---
 
-    // Transfer the LUSD tokens from the user to the Stability Pool's address, and update its recorded LUSD
-    function _sendLUSDtoStabilityPool(address _address, uint _amount) internal {
-        lusdToken.sendToPool(_address, address(this), _amount);
-        uint newTotalLUSDDeposits = totalLUSDDeposits.add(_amount);
-        totalLUSDDeposits = newTotalLUSDDeposits;
-        emit StabilityPoolLUSDBalanceUpdated(newTotalLUSDDeposits);
+    // Transfer the USDS tokens from the user to the Stability Pool's address, and update its recorded USDS
+    function _sendUSDStoStabilityPool(address _address, uint _amount) internal {
+        usdsToken.sendToPool(_address, address(this), _amount);
+        uint newTotalUSDSDeposits = totalUSDSDeposits.add(_amount);
+        totalUSDSDeposits = newTotalUSDSDeposits;
+        emit StabilityPoolUSDSBalanceUpdated(newTotalUSDSDeposits);
     }
 
-    function _sendETHGainToDepositor(uint _amount) internal {
+    function _sendBNBGainToDepositor(uint _amount) internal {
         if (_amount == 0) {
             return;
         }
-        uint newETH = ETH.sub(_amount);
-        ETH = newETH;
-        emit StabilityPoolETHBalanceUpdated(newETH);
+        uint newBNB = BNB.sub(_amount);
+        BNB = newBNB;
+        emit StabilityPoolBNBBalanceUpdated(newBNB);
         emit EtherSent(msg.sender, _amount);
 
         (bool success, ) = msg.sender.call{value: _amount}("");
-        require(success, "StabilityPool: sending ETH failed");
+        require(success, "StabilityPool: sending BNB failed");
     }
 
-    // Send LUSD to user and decrease LUSD in Pool
-    function _sendLUSDToDepositor(address _depositor, uint LUSDWithdrawal) internal {
-        if (LUSDWithdrawal == 0) {
+    // Send USDS to user and decrease USDS in Pool
+    function _sendUSDSToDepositor(address _depositor, uint USDSWithdrawal) internal {
+        if (USDSWithdrawal == 0) {
             return;
         }
 
-        lusdToken.returnFromPool(address(this), _depositor, LUSDWithdrawal);
-        _decreaseLUSD(LUSDWithdrawal);
+        usdsToken.returnFromPool(address(this), _depositor, USDSWithdrawal);
+        _decreaseUSDS(USDSWithdrawal);
     }
 
     // --- External Front End functions ---
@@ -895,7 +930,6 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
         frontEnds[msg.sender].kickbackRate = _kickbackRate;
         frontEnds[msg.sender].registered = true;
-        fronEndSets.add(msg.sender);
 
         emit FrontEndRegistered(msg.sender, _kickbackRate);
     }
@@ -913,109 +947,33 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         if (_newValue == 0) {
             delete deposits[_depositor].frontEndTag;
             delete depositSnapshots[_depositor];
-            emit DepositSnapshotUpdated(_depositor, 0, 0);
-            stakerSets.remove(_depositor);
-
+            emit DepositSnapshotUpdated(_depositor, 0, 0, 0);
             return;
         }
-
-        stakerSets.add(_depositor);
-
         uint128 currentScaleCached = currentScale;
         uint128 currentEpochCached = currentEpoch;
         uint currentP = P;
 
         // Get S and G for the current epoch and current scale
         uint currentS = epochToScaleToSum[currentEpochCached][currentScaleCached];
+        uint currentG = epochToScaleToG[currentEpochCached][currentScaleCached];
 
-        // Record new snapshots of the latest running product P, sum S, for the depositor
+        // Record new snapshots of the latest running product P, sum S, and sum G, for the depositor
         depositSnapshots[_depositor].P = currentP;
         depositSnapshots[_depositor].S = currentS;
+        depositSnapshots[_depositor].G = currentG;
         depositSnapshots[_depositor].scale = currentScaleCached;
         depositSnapshots[_depositor].epoch = currentEpochCached;
 
-        emit DepositSnapshotUpdated(_depositor, currentP, currentS);
-    }
-
-    function _updateRewardDebt(address _depositor, address _frontEnd) internal {
-        address frontEndTag = deposits[_depositor].frontEndTag;
-        uint kickbackRate = frontEndTag == address(0)
-            ? DECIMAL_PRECISION
-            : frontEnds[frontEndTag].kickbackRate;
-        deposits[_depositor].rewardDebt =
-            kickbackRate.mul(deposits[_depositor].initialValue * accumulatedRewardsPerShare) /
-            DECIMAL_PRECISION;
-        if (_frontEnd != address(0)) {
-            kickbackRate = frontEnds[_frontEnd].kickbackRate;
-            uint frontEndShare = uint(DECIMAL_PRECISION).sub(kickbackRate);
-            frontEndStakes[_frontEnd].rewardDebt =
-                frontEndShare.mul(
-                    frontEndStakes[_frontEnd].totalDeposits * accumulatedRewardsPerShare
-                ) /
-                DECIMAL_PRECISION;
-        }
-    }
-
-    function _resetAccPerShareAndPayOutProfit() internal {
-        updatePoolRewards();
-        uint stakerLength = stakerSets.length();
-        for (uint i = 0; i < stakerLength; i++) {
-            address stakerAddress = stakerSets.at(i);
-            Deposit storage deposit = deposits[stakerAddress];
-            address frontEndTag = deposits[stakerAddress].frontEndTag;
-            uint kickbackRate = frontEndTag == address(0)
-                ? DECIMAL_PRECISION
-                : frontEnds[frontEndTag].kickbackRate;
-            deposit.unpaidRewards = kickbackRate
-                .mul(deposit.initialValue.mul(accumulatedRewardsPerShare) / DECIMAL_PRECISION)
-                .sub(deposit.rewardDebt)
-                .div(DECIMAL_PRECISION)
-                .add(deposit.unpaidRewards);
-            deposit.rewardDebt = 0;
-        }
-
-        uint fronEndLength = fronEndSets.length();
-        for (uint i = 0; i < fronEndLength; i++) {
-            address frontEndAddress = fronEndSets.at(i);
-            FrontEndStake storage frontEnd = frontEndStakes[frontEndAddress];
-            uint kickbackRate = frontEnds[frontEndAddress].kickbackRate;
-            uint frontEndShare = uint(DECIMAL_PRECISION).sub(kickbackRate);
-            frontEnd.unpaidRewards = frontEndShare
-                .mul(frontEnd.totalDeposits.mul(accumulatedRewardsPerShare) / DECIMAL_PRECISION)
-                .sub(frontEnd.rewardDebt)
-                .div(DECIMAL_PRECISION)
-                .add(frontEnd.unpaidRewards);
-            frontEnd.rewardDebt = 0;
-        }
-        accumulatedRewardsPerShare = 0;
-    }
-
-    /**
-     * @dev Update pool's accumulatedRewardsPerShare and lastRewardedBlock
-     */
-    function updatePoolRewards() internal {
-        if (totalLUSDDeposits == 0) {
-            lastRewardedBlock = block.number;
-            return;
-        }
-        if (block.number > lastRewardedBlock) {
-            if (totalLUSDDeposits > 0) {
-                uint256 blocksSinceLastReward = block.number - lastRewardedBlock;
-                uint256 rewards = blocksSinceLastReward * rewardTokensPerBlock;
-                accumulatedRewardsPerShare =
-                    accumulatedRewardsPerShare +
-                    ((rewards * DECIMAL_PRECISION) / totalLUSDDeposits);
-            }
-            lastRewardedBlock = block.number;
-        }
+        emit DepositSnapshotUpdated(_depositor, currentP, currentS, currentG);
     }
 
     function _updateFrontEndStakeAndSnapshots(address _frontEnd, uint _newValue) internal {
-        frontEndStakes[_frontEnd].totalDeposits = _newValue;
+        frontEndStakes[_frontEnd] = _newValue;
 
         if (_newValue == 0) {
             delete frontEndSnapshots[_frontEnd];
-            emit FrontEndSnapshotUpdated(_frontEnd, 0);
+            emit FrontEndSnapshotUpdated(_frontEnd, 0, 0);
             return;
         }
 
@@ -1023,97 +981,34 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         uint128 currentEpochCached = currentEpoch;
         uint currentP = P;
 
-        // Record new snapshots of the latest running product P for the front end
+        // Get G for the current epoch and current scale
+        uint currentG = epochToScaleToG[currentEpochCached][currentScaleCached];
+
+        // Record new snapshots of the latest running product P and sum G for the front end
         frontEndSnapshots[_frontEnd].P = currentP;
+        frontEndSnapshots[_frontEnd].G = currentG;
         frontEndSnapshots[_frontEnd].scale = currentScaleCached;
         frontEndSnapshots[_frontEnd].epoch = currentEpochCached;
 
-        emit FrontEndSnapshotUpdated(_frontEnd, currentP);
+        emit FrontEndSnapshotUpdated(_frontEnd, currentP, currentG);
     }
 
-    function _payOutLQTYGainsDepositor(
+    function _payOutSABLEGains(
         ICommunityIssuance _communityIssuance,
         address _depositor,
-        uint _compoundedLUSDDeposit
+        address _frontEnd
     ) internal {
-        updatePoolRewards();
-        Deposit memory user = deposits[_depositor];
-        if (_compoundedLUSDDeposit == 0 && user.unpaidRewards == 0) {
-            return;
-        }
-        address frontEndTag = deposits[_depositor].frontEndTag;
-        /*
-         * If not tagged with a front end, the depositor gets a 100% cut of what their deposit earned.
-         * Otherwise, their cut of the deposit's earnings is equal to the kickbackRate, set by the front end through
-         * which they made their deposit.
-         */
-        uint kickbackRate = frontEndTag == address(0)
-            ? DECIMAL_PRECISION
-            : frontEnds[frontEndTag].kickbackRate;
-
-        uint depositorLQTYGain = kickbackRate
-            .mul(_compoundedLUSDDeposit.mul(accumulatedRewardsPerShare) / DECIMAL_PRECISION)
-            .sub(user.rewardDebt)
-            .div(DECIMAL_PRECISION)
-            .add(user.unpaidRewards);
-        uint balance = _communityIssuance.balanceLQTY();
-
-        if (balance > 0) {
-            if (depositorLQTYGain > balance) {
-                _communityIssuance.sendLQTY(_depositor, balance);
-                user.unpaidRewards = depositorLQTYGain - balance;
-            } else {
-                _communityIssuance.sendLQTY(_depositor, depositorLQTYGain);
-                user.unpaidRewards = 0;
-            }
+        // Pay out front end's SABLE gain
+        if (_frontEnd != address(0)) {
+            uint frontEndSABLEGain = getFrontEndSABLEGain(_frontEnd);
+            _communityIssuance.sendSABLE(_frontEnd, frontEndSABLEGain);
+            emit SABLEPaidToFrontEnd(_frontEnd, frontEndSABLEGain);
         }
 
-        user.rewardDebt = kickbackRate.mul(
-            _compoundedLUSDDeposit.mul(accumulatedRewardsPerShare) / DECIMAL_PRECISION
-        );
-        emit LQTYPaidToDepositor(_depositor, depositorLQTYGain);
-    }
-
-    function _payOutLQTYGainsFrontEnd(
-        ICommunityIssuance _communityIssuance,
-        address _frontEnd,
-        uint _compoundedLUSDDeposit
-    ) internal {
-        updatePoolRewards();
-        FrontEndStake memory frontEnd = frontEndStakes[_frontEnd];
-        if (
-            _compoundedLUSDDeposit == 0 || (_frontEnd == address(0) && frontEnd.unpaidRewards == 0)
-        ) {
-            return;
-        }
-
-        /*
-         * If not tagged with a front end, the depositor gets a 100% cut of what their deposit earned.
-         * Otherwise, their cut of the deposit's earnings is equal to the kickbackRate, set by the front end through
-         * which they made their deposit.
-         */
-        uint kickbackRate = frontEnds[_frontEnd].kickbackRate;
-        uint frontEndShare = uint(DECIMAL_PRECISION).sub(kickbackRate);
-
-        uint LQTYGain = frontEndShare
-            .mul(_compoundedLUSDDeposit.mul(accumulatedRewardsPerShare) / DECIMAL_PRECISION)
-            .sub(frontEnd.rewardDebt)
-            .div(DECIMAL_PRECISION)
-            .add(frontEnd.unpaidRewards);
-        uint balance = _communityIssuance.balanceLQTY();
-        if (balance > 0) {
-            if (LQTYGain > balance) {
-                _communityIssuance.sendLQTY(_frontEnd, balance);
-                frontEnd.unpaidRewards = LQTYGain - balance;
-            } else {
-                _communityIssuance.sendLQTY(_frontEnd, LQTYGain);
-                frontEnd.unpaidRewards = 0;
-            }
-        }
-        frontEnd.rewardDebt =
-            _compoundedLUSDDeposit.mul(accumulatedRewardsPerShare) /
-            DECIMAL_PRECISION;
-        emit LQTYPaidToFrontEnd(_frontEnd, LQTYGain);
+        // Pay out depositor's SABLE gain
+        uint depositorSABLEGain = getDepositorSABLEGain(_depositor);
+        _communityIssuance.sendSABLE(_depositor, depositorSABLEGain);
+        emit SABLEPaidToDepositor(_depositor, depositorSABLEGain);
     }
 
     // --- 'require' functions ---
@@ -1122,12 +1017,15 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
         require(msg.sender == address(activePool), "StabilityPool: Caller is not ActivePool");
     }
 
-    function _requireCallerIsTimeLock() internal view {
-        require(msg.sender == timeLockAddress, "StabilityPool: Caller is not TimeLock");
-    }
-
     function _requireCallerIsTroveManager() internal view {
         require(msg.sender == address(troveManager), "StabilityPool: Caller is not TroveManager");
+    }
+
+    function _requireCallerIsCommunityIssuance() internal view {
+        require(
+            msg.sender == address(communityIssuance),
+            "StabilityPool: Callier is not CommunityIssuance"
+        );
     }
 
     function _requireNoUnderCollateralizedTroves(bytes[] calldata priceFeedUpdateData) internal {
@@ -1156,13 +1054,13 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
     function _requireUserHasTrove(address _depositor) internal view {
         require(
             troveManager.getTroveStatus(_depositor) == 1,
-            "StabilityPool: caller must have an active trove to withdraw ETHGain to"
+            "StabilityPool: caller must have an active trove to withdraw BNBGain to"
         );
     }
 
-    function _requireUserHasETHGain(address _depositor) internal view {
-        uint ETHGain = getDepositorETHGain(_depositor);
-        require(ETHGain > 0, "StabilityPool: caller must have non-zero ETH Gain");
+    function _requireUserHasBNBGain(address _depositor) internal view {
+        uint BNBGain = getDepositorBNBGain(_depositor);
+        require(BNBGain > 0, "StabilityPool: caller must have non-zero BNB Gain");
     }
 
     function _requireFrontEndNotRegistered(address _address) internal view {
@@ -1190,7 +1088,7 @@ contract StabilityPool is LiquityBase, Ownable, CheckContract, IStabilityPool {
 
     receive() external payable {
         _requireCallerIsActivePool();
-        ETH = ETH.add(msg.value);
-        StabilityPoolETHBalanceUpdated(ETH);
+        BNB = BNB.add(msg.value);
+        StabilityPoolBNBBalanceUpdated(BNB);
     }
 }

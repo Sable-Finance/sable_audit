@@ -11,7 +11,7 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
   const [bountyAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
   
   let contracts
-  let lusdToken
+  let usdsToken
   let sortedTroves
   let troveManager
   let activePool
@@ -20,17 +20,17 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
   let borrowerOperations
   let troveHelper
 
-  let lqtyStaking
+  let sableStaking
   let communityIssuance
-  let lqtyToken 
+  let sableToken 
 
   before(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.borrowerOperations = await BorrowerOperationsTester.new()
-    contracts = await deploymentHelper.deployLUSDToken(contracts)
-    const LQTYContracts = await deploymentHelper.deployLQTYContracts(bountyAddress, 1000000)
+    contracts = await deploymentHelper.deployUSDSToken(contracts)
+    const SABLEContracts = await deploymentHelper.deploySABLEContracts(bountyAddress, 1000000)
 
-    lusdToken = contracts.lusdToken
+    usdsToken = contracts.usdsToken
     sortedTroves = contracts.sortedTroves
     troveManager = contracts.troveManager
     activePool = contracts.activePool
@@ -39,9 +39,9 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
     borrowerOperations = contracts.borrowerOperations
     troveHelper = contracts.troveHelper
 
-    lqtyStaking = LQTYContracts.lqtyStaking
-    communityIssuance = LQTYContracts.communityIssuance
-    lqtyToken = LQTYContracts.lqtyToken
+    sableStaking = SABLEContracts.sableStaking
+    communityIssuance = SABLEContracts.communityIssuance
+    sableToken = SABLEContracts.sableToken
   })
 
   const testZeroAddress = async (contract, params, method = 'setAddresses', skip = 0) => {
@@ -94,7 +94,6 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
   const testSetParams = async (contract, numberOfAddresses) => {
     const dumbContract = await GasPool.new()
     const params = Array(numberOfAddresses).fill(dumbContract.address)
-    params.push(100000)
 
     // Attempt call from alice
     await th.assertRevert(contract.setParams(...params, { from: alice }))
@@ -122,10 +121,10 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
         gasPoolAddress: dumbContract.address,
         collSurplusPoolAddress: dumbContract.address,
         priceFeedAddress: dumbContract.address,
-        lusdTokenAddress: dumbContract.address,
+        usdsTokenAddress: dumbContract.address,
         sortedTrovesAddress: dumbContract.address,
-        lqtyTokenAddress: dumbContract.address,
-        lqtyStakingAddress: dumbContract.address,
+        sableTokenAddress: dumbContract.address,
+        sableStakingAddress: dumbContract.address,
         systemStateAddress: dumbContract.address,
         oracleRateCalcAddress: dumbContract.address,
         troveHelperAddress: dumbContract.address,
@@ -139,10 +138,10 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
         gasPoolAddress: th.ZERO_ADDRESS,
         collSurplusPoolAddress: th.ZERO_ADDRESS,
         priceFeedAddress: th.ZERO_ADDRESS,
-        lusdTokenAddress: th.ZERO_ADDRESS,
+        usdsTokenAddress: th.ZERO_ADDRESS,
         sortedTrovesAddress: th.ZERO_ADDRESS,
-        lqtyTokenAddress: th.ZERO_ADDRESS,
-        lqtyStakingAddress: th.ZERO_ADDRESS,
+        sableTokenAddress: th.ZERO_ADDRESS,
+        sableStakingAddress: th.ZERO_ADDRESS,
         systemStateAddress: th.ZERO_ADDRESS,
         oracleRateCalcAddress: th.ZERO_ADDRESS,
         troveHelperAddress: th.ZERO_ADDRESS
@@ -156,10 +155,10 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
         gasPoolAddress: dumbContract.address,
         collSurplusPoolAddress: dumbContract.address,
         priceFeedAddress: dumbContract.address,
-        lusdTokenAddress: dumbContract.address,
+        usdsTokenAddress: dumbContract.address,
         sortedTrovesAddress: dumbContract.address,
-        lqtyTokenAddress: dumbContract.address,
-        lqtyStakingAddress: dumbContract.address,
+        sableTokenAddress: dumbContract.address,
+        sableStakingAddress: dumbContract.address,
         systemStateAddress: dumbContract.address,
         oracleRateCalcAddress: dumbContract.address,
         troveHelperAddress: dumbContract.address
@@ -194,8 +193,8 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
         collSurplusPoolAddress: dumbContract.address,
         priceFeedAddress: dumbContract.address,
         sortedTrovesAddress: dumbContract.address,
-        lusdTokenAddress: dumbContract.address,
-        lqtyStakingAddress: dumbContract.address,
+        usdsTokenAddress: dumbContract.address,
+        sableStakingAddress: dumbContract.address,
         systemStateAddress: dumbContract.address,
         oracleRateCalcAddress: dumbContract.address
       }
@@ -209,8 +208,8 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
         collSurplusPoolAddress: dumbContract.address,
         priceFeedAddress: dumbContract.address,
         sortedTrovesAddress: dumbContract.address,
-        lusdTokenAddress: dumbContract.address,
-        lqtyStakingAddress: dumbContract.address,
+        usdsTokenAddress: dumbContract.address,
+        sableStakingAddress: dumbContract.address,
         systemStateAddress: dumbContract.address,
         oracleRateCalcAddress: dumbContract.address
       }
@@ -224,8 +223,8 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
         collSurplusPoolAddress: dumbContract.address,
         priceFeedAddress: dumbContract.address,
         sortedTrovesAddress: dumbContract.address,
-        lusdTokenAddress: dumbContract.address,
-        lqtyStakingAddress: dumbContract.address,
+        usdsTokenAddress: dumbContract.address,
+        sableStakingAddress: dumbContract.address,
         systemStateAddress: dumbContract.address,
         oracleRateCalcAddress: dumbContract.address
       }
@@ -255,7 +254,7 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
 
   describe('StabilityPool', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetParams(stabilityPool, 9)
+      await testSetParams(stabilityPool, 8)
     })
   })
 
@@ -289,26 +288,26 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
 
   describe('CommunityIssuance', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      const params = [lqtyToken.address, stabilityPool.address]
-      await th.assertRevert(communityIssuance.setAddresses(...params, { from: alice }))
+      const params = [sableToken.address, stabilityPool.address, th.dec(1, 18)]
+      await th.assertRevert(communityIssuance.setParams(...params, { from: alice }))
 
       // Attempt to use zero address
-      await testZeroAddress(communityIssuance, params)
+      await testZeroParam(communityIssuance, params)
       // Attempt to use non contract
-      await testNonContractAddress(communityIssuance, params)
+      await testNonContractParam(communityIssuance, params)
 
       // Owner can successfully set any address
-      const txOwner = await communityIssuance.setAddresses(...params, { from: owner })
+      const txOwner = await communityIssuance.setParams(...params, { from: owner })
 
       assert.isTrue(txOwner.receipt.status)
       // fails if called twice
-      await th.assertRevert(communityIssuance.setAddresses(...params, { from: owner }))
+      await th.assertRevert(communityIssuance.setParams(...params, { from: owner }))
     })
   })
 
-  describe('LQTYStaking', async accounts => {
+  describe('SABLEStaking', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(lqtyStaking, 5)
+      await testSetAddresses(sableStaking, 5)
     })
   })
 

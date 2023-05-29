@@ -3,7 +3,7 @@
 pragma solidity 0.6.11;
 
 interface ISystemState {
-    function setLUSDGasCompensation(uint _value) external;
+    function setUSDSGasCompensation(uint _value) external;
 
     function setBorrowingFeeFloor(uint _value) external;
 
@@ -15,7 +15,7 @@ interface ISystemState {
 
     function setCCR(uint _value) external;
 
-    function getLUSDGasCompensation() external view returns (uint);
+    function getUSDSGasCompensation() external view returns (uint);
 
     function getBorrowingFeeFloor() external view returns (uint);
 
@@ -27,7 +27,7 @@ interface ISystemState {
 
     function getCCR() external view returns (uint);
 
-    event LUSDGasCompensationChanged(uint _o, uint _n);
+    event USDSGasCompensationChanged(uint _o, uint _n);
     event BorrowingFeeFloorChanged(uint _o, uint _n);
     event RedemptionFeeFloorChanged(uint _o, uint _n);
     event MinNetDebtChanged(uint _o, uint _n);

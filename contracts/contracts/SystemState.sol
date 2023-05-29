@@ -20,10 +20,10 @@ contract SystemState is CheckContract, ISystemState, Ownable {
     // Critical system collateral ratio. If the system's total collateral ratio (TCR) falls below the CCR, Recovery Mode is triggered.
     uint private ccr; // 1500000000000000000; // 150%
 
-    // Amount of LUSD to be locked in gas pool on opening troves
-    uint private LUSDGasCompensation; //  10e18;
+    // Amount of USDS to be locked in gas pool on opening troves
+    uint private USDSGasCompensation; //  10e18;
 
-    // Minimum amount of net LUSD debt a trove must have
+    // Minimum amount of net USDS debt a trove must have
     uint private minNetDebt; // 90e18
 
     uint private borrowingFeeFloor; // 0.05%
@@ -36,7 +36,7 @@ contract SystemState is CheckContract, ISystemState, Ownable {
         address _timelock,
         uint _mcr,
         uint _ccr,
-        uint _LUSDGasCompensation,
+        uint _USDSGasCompensation,
         uint _minNetDebt,
         uint _borrowingFeeFloor,
         uint _redemptionFeeFloor
@@ -44,9 +44,9 @@ contract SystemState is CheckContract, ISystemState, Ownable {
         checkContract(_timelock);
         timeLock = _timelock;
 
-        _setMCR(_mcr);
         _setCCR(_ccr);
-        _setLUSDGasCompensation(_LUSDGasCompensation);
+        _setMCR(_mcr);
+        _setUSDSGasCompensation(_USDSGasCompensation);
         _setMinNetDebt(_minNetDebt);
         _setBorrowingFeeFloor(_borrowingFeeFloor);
         _setRedemptionFeeFloor(_redemptionFeeFloor);
@@ -61,8 +61,8 @@ contract SystemState is CheckContract, ISystemState, Ownable {
 
     // External function
 
-    function setLUSDGasCompensation(uint _value) external override onlyTimeLock {
-        _setLUSDGasCompensation(_value);
+    function setUSDSGasCompensation(uint _value) external override onlyTimeLock {
+        _setUSDSGasCompensation(_value);
     }
 
     function setBorrowingFeeFloor(uint _value) external override onlyTimeLock {
@@ -85,8 +85,8 @@ contract SystemState is CheckContract, ISystemState, Ownable {
         _setCCR(_value);
     }
 
-    function getLUSDGasCompensation() external view override returns (uint) {
-        return LUSDGasCompensation;
+    function getUSDSGasCompensation() external view override returns (uint) {
+        return USDSGasCompensation;
     }
 
     function getBorrowingFeeFloor() external view override returns (uint) {
@@ -110,10 +110,10 @@ contract SystemState is CheckContract, ISystemState, Ownable {
     }
 
     // internal function
-     function _setLUSDGasCompensation(uint _value) internal {
-        uint oldValue = LUSDGasCompensation;
-        LUSDGasCompensation = _value;
-        emit LUSDGasCompensationChanged(oldValue, _value);
+     function _setUSDSGasCompensation(uint _value) internal {
+        uint oldValue = USDSGasCompensation;
+        USDSGasCompensation = _value;
+        emit USDSGasCompensationChanged(oldValue, _value);
     }
 
     function _setBorrowingFeeFloor(uint _value) internal {
@@ -129,18 +129,21 @@ contract SystemState is CheckContract, ISystemState, Ownable {
     }
 
     function _setMinNetDebt(uint _value) internal {
+        require(_value > 0, "SystemState: Min net debt must > 0");
         uint oldValue = minNetDebt;
         minNetDebt = _value;
         emit MinNetDebtChanged(oldValue, _value);
     }
 
     function _setMCR(uint _value) internal {
+        require(_value > 1000000000000000000 && _value < ccr, "SystemState: 100% < MCR < CCR");
         uint oldValue = mcr;
         mcr = _value;
         emit MCR_Changed(oldValue, _value);
     }
 
     function _setCCR(uint _value) internal {
+        require(_value > mcr, "SystemState: CCR > MCR");
         uint oldValue = ccr;
         ccr = _value;
         emit CCR_Changed(oldValue, _value);

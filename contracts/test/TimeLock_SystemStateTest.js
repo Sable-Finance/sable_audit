@@ -41,7 +41,7 @@ contract("TimeLock-SystemState", async accounts => {
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore();
     const MINT_AMOUNT = toBN(dec(100000000, 18));
-    const LQTYContracts = await deploymentHelper.deployLQTYContracts(
+    const SABLEContracts = await deploymentHelper.deploySABLEContracts(
       bountyAddress,
       MINT_AMOUNT
     );
@@ -50,15 +50,15 @@ contract("TimeLock-SystemState", async accounts => {
     stabilityPool = contracts.stabilityPool;
 
     ;
-    await deploymentHelper.connectCoreContracts(contracts, LQTYContracts);
-    await deploymentHelper.connectLQTYContractsToCore(LQTYContracts, contracts);
+    await deploymentHelper.connectCoreContracts(contracts, SABLEContracts);
+    await deploymentHelper.connectSABLEContractsToCore(SABLEContracts, contracts);
     minDelay = await timeLock.getMinDelay();
   });
 
   it("SystemState - will return with set default", async () => {
     expect(await systemState.getMCR()).to.be.bignumber.equal("1100000000000000000");
     expect(await systemState.getCCR()).to.be.bignumber.equal("1500000000000000000");
-    expect(await systemState.getLUSDGasCompensation()).to.be.bignumber.equal((200e18).toString());
+    expect(await systemState.getUSDSGasCompensation()).to.be.bignumber.equal((200e18).toString());
     expect(await systemState.getMinNetDebt()).to.be.bignumber.equal("1800000000000000000000");
     expect(await systemState.getBorrowingFeeFloor()).to.be.bignumber.equal((5e15).toString());
     expect(await systemState.getRedemptionFeeFloor()).to.be.bignumber.equal((5e15).toString());
@@ -67,7 +67,7 @@ contract("TimeLock-SystemState", async accounts => {
   it("System state will revert with call from different timelock", async () => {
     await assertRevert(systemState.setMCR(1000), "Caller is not from timelock");
     await assertRevert(systemState.setCCR(1000), "Caller is not from timelock");
-    await assertRevert(systemState.setLUSDGasCompensation(1000), "Caller is not from timelock");
+    await assertRevert(systemState.setUSDSGasCompensation(1000), "Caller is not from timelock");
     await assertRevert(systemState.setMinNetDebt(1000), "Caller is not from timelock");
     await assertRevert(systemState.setBorrowingFeeFloor(1000), "Caller is not from timelock");
     await assertRevert(systemState.setRedemptionFeeFloor(1000), "Caller is not from timelock");
@@ -103,10 +103,10 @@ contract("TimeLock-SystemState", async accounts => {
     expect(await timeLock.isOperation(id)).to.be.eq(false);
   });
 
-  it("Timelock - should execute queue success - setLUSDGasCompensation", async () => {
+  it("Timelock - should execute queue success - setUSDSGasCompensation", async () => {
     let executeTime = minDelay.add(new BN("200")); // 200 second after min delay
-    const iface = new Interface(["function setLUSDGasCompensation(uint)"]);
-    const newValue = iface.encodeFunctionData("setLUSDGasCompensation", [1000]);
+    const iface = new Interface(["function setUSDSGasCompensation(uint)"]);
+    const newValue = iface.encodeFunctionData("setUSDSGasCompensation", [1000]);
     const zeroBytes = defaultAbiCoder.encode(["uint"], [0]);
     await timeLock.schedule(systemState.address, 0, newValue, zeroBytes, zeroBytes, executeTime, {
       from: owner
@@ -117,13 +117,14 @@ contract("TimeLock-SystemState", async accounts => {
     expect(await timeLock.isOperation(id)).to.be.eq(true);
     await time.increase(Number(executeTime) + 1);
     await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner, value : 1000 });
-    expect(await systemState.getLUSDGasCompensation()).to.be.bignumber.equal((1000).toString());
+    expect(await systemState.getUSDSGasCompensation()).to.be.bignumber.equal((1000).toString());
   });
 
   it("Timelock - should execute queue success - setMCR", async () => {
     let executeTime = minDelay.add(new BN("200")); // 200 second after min delay
     const iface = new Interface(["function setMCR(uint)"]);
-    const newValue = iface.encodeFunctionData("setMCR", [1000]);
+    const value = new BN("1200000000000000000");
+    const newValue = iface.encodeFunctionData("setMCR", [value.toString()]);
     const zeroBytes = defaultAbiCoder.encode(["uint"], [0]);
     await timeLock.schedule(systemState.address, 0, newValue, zeroBytes, zeroBytes, executeTime, {
       from: owner
@@ -134,13 +135,14 @@ contract("TimeLock-SystemState", async accounts => {
     expect(await timeLock.isOperation(id)).to.be.eq(true);
     await time.increase(Number(executeTime) + 1);
     await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner });
-    expect(await systemState.getMCR()).to.be.bignumber.equal((1000).toString());
+    expect(await systemState.getMCR()).to.be.bignumber.equal((value).toString());
   });
 
   it("Timelock - should execute queue success - setCCR", async () => {
     let executeTime = minDelay.add(new BN("200")); // 200 second after min delay
     const iface = new Interface(["function setCCR(uint)"]);
-    const newValue = iface.encodeFunctionData("setCCR", [1000]);
+    const value = new BN("1550000000000000000");
+    const newValue = iface.encodeFunctionData("setCCR", [value.toString()]);
     const zeroBytes = defaultAbiCoder.encode(["uint"], [0]);
     await timeLock.schedule(systemState.address, 0, newValue, zeroBytes, zeroBytes, executeTime, {
       from: owner
@@ -151,7 +153,7 @@ contract("TimeLock-SystemState", async accounts => {
     expect(await timeLock.isOperation(id)).to.be.eq(true);
     await time.increase(Number(executeTime) + 1);
     await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner });
-    expect(await systemState.getCCR()).to.be.bignumber.equal((1000).toString());
+    expect(await systemState.getCCR()).to.be.bignumber.equal((value).toString());
   });
 
   it("Timelock - should execute queue success - setBorrowingFeeFloor", async () => {
@@ -205,27 +207,10 @@ contract("TimeLock-SystemState", async accounts => {
     expect(await systemState.getMinNetDebt()).to.be.bignumber.equal((1000).toString());
   });
 
-  it("Timelock - should execute queue success - setRewardPerBlock", async () => {
-    let executeTime = minDelay.add(new BN("200")); // 200 second after min delay
-    const iface = new Interface(["function setRewardsPerBlock(uint)"]);
-    const newValue = iface.encodeFunctionData("setRewardsPerBlock", [2e18.toString()]);
-    const zeroBytes = defaultAbiCoder.encode(["uint"], [0]);
-    await timeLock.schedule(stabilityPool.address, 0, newValue, zeroBytes, zeroBytes, executeTime, {
-      from: owner
-    });
-    const id = await timeLock.hashOperation(stabilityPool.address, 0, newValue, zeroBytes, zeroBytes, {
-      from: owner
-    });
-    expect(await timeLock.isOperation(id)).to.be.eq(true);
-    await time.increase(Number(executeTime) + 1);
-    await timeLock.execute(stabilityPool.address, 0, newValue, zeroBytes, zeroBytes, { from: owner });
-    expect(await stabilityPool.getRewarsPerBlock()).to.be.bignumber.equal((2e18).toString());
-  });
-
   it("Timelock - should execute queue failed - Timestamp not passed", async () => {
     let executeTime = minDelay.add(new BN("200")); // 200 second after min delay
-    const iface = new Interface(["function setLUSDGasCompensation(uint)"]);
-    const newValue = iface.encodeFunctionData("setLUSDGasCompensation", [1000]);
+    const iface = new Interface(["function setUSDSGasCompensation(uint)"]);
+    const newValue = iface.encodeFunctionData("setUSDSGasCompensation", [1000]);
     const zeroBytes = defaultAbiCoder.encode(["uint"], [0]);
     await timeLock.schedule(systemState.address, 0, newValue, zeroBytes, zeroBytes, executeTime, {
       from: owner
@@ -238,6 +223,64 @@ contract("TimeLock-SystemState", async accounts => {
     await assertRevert(
       timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner }),
       "Timestamp not passed"
+    );
+  });
+
+  it("Timelock - should set new MCR success", async () => {
+    let executeTime = minDelay.add(new BN("200")); // 200 second after min delay
+    const iface = new Interface(["function setMCR(uint)"]);
+    const value = new BN("1200000000000000000");
+    const newValue = iface.encodeFunctionData("setMCR", [value.toString()]);
+    const zeroBytes = defaultAbiCoder.encode(["uint"], [0]);
+    await timeLock.schedule(systemState.address, 0, newValue, zeroBytes, zeroBytes, executeTime, {
+      from: owner
+    });
+    const id = await timeLock.hashOperation(systemState.address, 0, newValue, zeroBytes, zeroBytes, {
+      from: owner
+    });
+    expect(await timeLock.isOperation(id)).to.be.eq(true);
+    await time.increase(Number(executeTime) + 1);
+    await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner });
+    expect(await systemState.getMCR()).to.be.bignumber.equal((value).toString());
+  });
+
+  it("Timelock - should not set new MCR <= 100%", async () => {
+    let executeTime = minDelay.add(new BN("200")); // 200 second after min delay
+    const iface = new Interface(["function setMCR(uint)"]);
+    const value = new BN("990000000000000000");
+    const newValue = iface.encodeFunctionData("setMCR", [value.toString()]);
+    const zeroBytes = defaultAbiCoder.encode(["uint"], [0]);
+    await timeLock.schedule(systemState.address, 0, newValue, zeroBytes, zeroBytes, executeTime, {
+      from: owner
+    });
+    const id = await timeLock.hashOperation(systemState.address, 0, newValue, zeroBytes, zeroBytes, {
+      from: owner
+    });
+    expect(await timeLock.isOperation(id)).to.be.eq(true);
+    await time.increase(Number(executeTime) + 1);
+    await assertRevert(
+      timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner }),
+      "TimelockController: underlying transaction reverted"
+    );
+  });
+
+  it("Timelock - should not set new MCR >= CCR", async () => {
+    let executeTime = minDelay.add(new BN("200")); // 200 second after min delay
+    const iface = new Interface(["function setMCR(uint)"]);
+    const value = new BN("1500000000000000000");
+    const newValue = iface.encodeFunctionData("setMCR", [value.toString()]);
+    const zeroBytes = defaultAbiCoder.encode(["uint"], [0]);
+    await timeLock.schedule(systemState.address, 0, newValue, zeroBytes, zeroBytes, executeTime, {
+      from: owner
+    });
+    const id = await timeLock.hashOperation(systemState.address, 0, newValue, zeroBytes, zeroBytes, {
+      from: owner
+    });
+    expect(await timeLock.isOperation(id)).to.be.eq(true);
+    await time.increase(Number(executeTime) + 1);
+    await assertRevert(
+      timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner }),
+      "TimelockController: underlying transaction reverted"
     );
   });
 

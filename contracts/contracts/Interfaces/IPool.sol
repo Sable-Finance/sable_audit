@@ -7,8 +7,8 @@ interface IPool {
     
     // --- Events ---
     
-    event ETHBalanceUpdated(uint _newBalance);
-    event LUSDBalanceUpdated(uint _newBalance);
+    event BNBBalanceUpdated(uint _newBalance);
+    event USDSBalanceUpdated(uint _newBalance);
     event ActivePoolAddressChanged(address _newActivePoolAddress);
     event DefaultPoolAddressChanged(address _newDefaultPoolAddress);
     event StabilityPoolAddressChanged(address _newStabilityPoolAddress);
@@ -16,11 +16,11 @@ interface IPool {
 
     // --- Functions ---
     
-    function getETH() external view returns (uint);
+    function getBNB() external view returns (uint);
 
-    function getLUSDDebt() external view returns (uint);
+    function getUSDSDebt() external view returns (uint);
 
-    function increaseLUSDDebt(uint _amount) external;
+    function increaseUSDSDebt(uint _amount) external;
 
-    function decreaseLUSDDebt(uint _amount) external;
+    function decreaseUSDSDebt(uint _amount) external;
 }

@@ -2,18 +2,18 @@
 
 pragma solidity 0.6.11;
 
-import "../LQTY/CommunityIssuance.sol";
+import "../SABLE/CommunityIssuance.sol";
 
 contract CommunityIssuanceTester is CommunityIssuance {
-    function obtainLQTY(uint _amount) external {
-        lqtyToken.transfer(msg.sender, _amount);
+    function obtainSABLE(uint _amount) external {
+        sableToken.transfer(msg.sender, _amount);
     }
 
-    function getCumulativeIssuanceFraction() external view returns (uint) {
+    function getCumulativeIssuanceFraction() external pure returns (uint) {
         return 0; // TODO: for test issurance
     }
 
-    function unprotectedIssueLQTY() external returns (uint) {
+    function unprotectedIssueSABLE() external pure returns (uint) {
         // No checks on caller address
 
         return 0; // TODO: for test issurance

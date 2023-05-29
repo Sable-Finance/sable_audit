@@ -2,25 +2,25 @@
 const SortedTroves = artifacts.require("./SortedTroves.sol")
 const TroveManager = artifacts.require("./TroveManager.sol")
 const PriceFeed = artifacts.require("./PriceFeed.sol")
-const LUSDToken = artifacts.require("./LUSDToken.sol")
+const USDSToken = artifacts.require("./USDSToken.sol")
 const ActivePool = artifacts.require("./ActivePool.sol");
 const DefaultPool = artifacts.require("./DefaultPool.sol");
 const StabilityPool = artifacts.require("./StabilityPool.sol")
 const FunctionCaller = artifacts.require("./FunctionCaller.sol")
 const BorrowerOperations = artifacts.require("./BorrowerOperations.sol")
 
-const LQTYStaking = artifacts.require("./LQTY/LQTYStaking.sol")
-const LQTYToken = artifacts.require("./LQTY/LQTYToken.sol")
-const CommunityIssuance = artifacts.require("./LQTY/CommunityIssuance.sol")
+const SABLEStaking = artifacts.require("./SABLE/SABLEStaking.sol")
+const SABLEToken = artifacts.require("./SABLE/SABLEToken.sol")
+const CommunityIssuance = artifacts.require("./SABLE/CommunityIssuance.sol")
 const HintHelpers = artifacts.require("./HintHelpers.sol")
 
-const CommunityIssuanceTester = artifacts.require("./LQTY/CommunityIssuanceTester.sol")
+const CommunityIssuanceTester = artifacts.require("./SABLE/CommunityIssuanceTester.sol")
 const ActivePoolTester = artifacts.require("./ActivePoolTester.sol")
 const DefaultPoolTester = artifacts.require("./DefaultPoolTester.sol")
 const LiquityMathTester = artifacts.require("./LiquityMathTester.sol")
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol")
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol")
-const LUSDTokenTester = artifacts.require("./LUSDTokenTester.sol")
+const USDSTokenTester = artifacts.require("./USDSTokenTester.sol")
 
 const { TestHelper: th } = require("../utils/testHelpers.js")
 
@@ -30,7 +30,7 @@ const ARBITRARY_ADDRESS = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"   // plac
 const coreContractABIs = [
   BorrowerOperations,
   PriceFeed,
-  LUSDToken,
+  USDSToken,
   SortedTroves,
   TroveManager,
   ActivePool,
@@ -40,9 +40,9 @@ const coreContractABIs = [
   HintHelpers,
 ]
 
-const LQTYContractABIs = [
-  LQTYStaking,
-  LQTYToken,
+const SABLEContractABIs = [
+  SABLEStaking,
+  SABLEToken,
   LockupContractFactory,
   CommunityIssuance
 ]
@@ -54,7 +54,7 @@ const TesterContractABIs  = [
   LiquityMathTester,
   BorrowerOperationsTester,
   TroveManagerTester,
-  LUSDTokenTester,
+  USDSTokenTester,
 ]
 
 const getGasFromContractDeployment = async (contractObject, name) => {
@@ -73,9 +73,9 @@ const getBytecodeSize = (contractABI) => {
   // console.log(`${contractABI.contractName} deployed bytecode length: ${deployedBytecodeLength}`)
 }
 
-const getUSDCostFromGasCost = (deploymentGasTotal, gasPriceInGwei, ETHPrice) => {
-  const dollarCost = (deploymentGasTotal * gasPriceInGwei * ETHPrice) / 1e9
-  console.log(`At gas price ${gasPriceInGwei} GWei, and ETH Price $${ETHPrice} per ETH, the total cost of deployment in USD is: $${dollarCost}`)
+const getUSDCostFromGasCost = (deploymentGasTotal, gasPriceInGwei, BNBPrice) => {
+  const dollarCost = (deploymentGasTotal * gasPriceInGwei * BNBPrice) / 1e9
+  console.log(`At gas price ${gasPriceInGwei} GWei, and BNB Price $${BNBPrice} per BNB, the total cost of deployment in USD is: $${dollarCost}`)
 }
 
 const logContractDeploymentCosts = async (contracts) => {
@@ -108,19 +108,19 @@ const logContractBytecodeLengths = (contractABIs) => {
 // Run script: log deployment gas costs and bytecode lengths for all contracts
 async function main() {
   const coreContracts = await dh.deployLiquityCoreHardhat()
-  const LQTYContracts = await dh.deployLQTYContractsHardhat(ARBITRARY_ADDRESS, ARBITRARY_ADDRESS)
+  const SABLEContracts = await dh.deploySABLEContractsHardhat(ARBITRARY_ADDRESS, ARBITRARY_ADDRESS)
   const testerContracts = await dh.deployTesterContractsHardhat()
 
-  await dh.connectCoreContracts(coreContracts, LQTYContracts)
-  await dh.connectLQTYContracts(LQTYContracts)
-  await dh.connectLQTYContractsToCore(LQTYContracts, coreContracts)
+  await dh.connectCoreContracts(coreContracts, SABLEContracts)
+  await dh.connectSABLEContracts(SABLEContracts)
+  await dh.connectSABLEContractsToCore(SABLEContracts, coreContracts)
 
 
   console.log(`\n`)
-  console.log(`LQTY CONTRACTS`)
-  await logContractDeploymentCosts(LQTYContracts)
+  console.log(`SABLE CONTRACTS`)
+  await logContractDeploymentCosts(SABLEContracts)
   console.log(`\n`)
-  logContractBytecodeLengths(LQTYContractABIs)
+  logContractBytecodeLengths(SABLEContractABIs)
   console.log(`\n`)
 
   console.log(`CORE CONTRACTS`)

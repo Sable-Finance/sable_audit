@@ -20,8 +20,8 @@ async function main() {
   // let now = Math.floor(new Date().getTime() / 1000); ;
   // let executeTime = new BN(now).add(new BN("10")).add(new BN("200")); // 200 second after min delay
   // console.log("🚀 ~ file: test-timelock.ts:22 ~ main ~ executeTime:", executeTime)
-  const iface = new Interface(["function setLUSDGasCompensation(uint)"]);
-  const newValue = iface.encodeFunctionData("setLUSDGasCompensation", [1000]);
+  const iface = new Interface(["function setUSDSGasCompensation(uint)"]);
+  const newValue = iface.encodeFunctionData("setUSDSGasCompensation", [1000]);
   let tx = await timeLock.connect(signer).queue(systemState, 0, "", newValue, "1680770589");
   // const id = await timeLock.getTxId(systemState, 0, "", newValue,  executeTime.toString());
   //   let tx = await timeLock.connect(signer).cancel("0x475cf19164e173188aa22d4f7c0ce9daf2709237a0c72ae303fb8e4ea104eff7");

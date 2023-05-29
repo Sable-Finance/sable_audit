@@ -9,9 +9,9 @@ import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
 
 /*
- * The Active Pool holds the ETH collateral and LUSD debt (but not LUSD tokens) for all active troves.
+ * The Active Pool holds the BNB collateral and USDS debt (but not USDS tokens) for all active troves.
  *
- * When a trove is liquidated, it's ETH and LUSD debt are transferred from the Active Pool, to either the
+ * When a trove is liquidated, it's BNB and USDS debt are transferred from the Active Pool, to either the
  * Stability Pool, the Default Pool, or both, depending on the liquidation conditions.
  *
  */
@@ -24,15 +24,15 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     address public troveManagerAddress;
     address public stabilityPoolAddress;
     address public defaultPoolAddress;
-    uint256 internal ETH;  // deposited ether tracker
-    uint256 internal LUSDDebt;
+    uint256 internal BNB;  // deposited ether tracker
+    uint256 internal USDSDebt;
 
     // --- Events ---
 
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event TroveManagerAddressChanged(address _newTroveManagerAddress);
-    event ActivePoolLUSDDebtUpdated(uint _LUSDDebt);
-    event ActivePoolETHBalanceUpdated(uint _ETH);
+    event ActivePoolUSDSDebtUpdated(uint _USDSDebt);
+    event ActivePoolBNBBalanceUpdated(uint _BNB);
 
     // --- Contract setters ---
 
@@ -66,40 +66,40 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
     // --- Getters for public variables. Required by IPool interface ---
 
     /*
-    * Returns the ETH state variable.
+    * Returns the BNB state variable.
     *
-    *Not necessarily equal to the the contract's raw ETH balance - ether can be forcibly sent to contracts.
+    *Not necessarily equal to the the contract's raw BNB balance - ether can be forcibly sent to contracts.
     */
-    function getETH() external view override returns (uint) {
-        return ETH;
+    function getBNB() external view override returns (uint) {
+        return BNB;
     }
 
-    function getLUSDDebt() external view override returns (uint) {
-        return LUSDDebt;
+    function getUSDSDebt() external view override returns (uint) {
+        return USDSDebt;
     }
 
     // --- Pool functionality ---
 
-    function sendETH(address _account, uint _amount) external override {
+    function sendBNB(address _account, uint _amount) external override {
         _requireCallerIsBOorTroveMorSP();
-        ETH = ETH.sub(_amount);
-        emit ActivePoolETHBalanceUpdated(ETH);
+        BNB = BNB.sub(_amount);
+        emit ActivePoolBNBBalanceUpdated(BNB);
         emit EtherSent(_account, _amount);
 
         (bool success, ) = _account.call{ value: _amount }("");
-        require(success, "ActivePool: sending ETH failed");
+        require(success, "ActivePool: sending BNB failed");
     }
 
-    function increaseLUSDDebt(uint _amount) external override {
+    function increaseUSDSDebt(uint _amount) external override {
         _requireCallerIsBOorTroveM();
-        LUSDDebt  = LUSDDebt.add(_amount);
-        ActivePoolLUSDDebtUpdated(LUSDDebt);
+        USDSDebt  = USDSDebt.add(_amount);
+        ActivePoolUSDSDebtUpdated(USDSDebt);
     }
 
-    function decreaseLUSDDebt(uint _amount) external override {
+    function decreaseUSDSDebt(uint _amount) external override {
         _requireCallerIsBOorTroveMorSP();
-        LUSDDebt = LUSDDebt.sub(_amount);
-        ActivePoolLUSDDebtUpdated(LUSDDebt);
+        USDSDebt = USDSDebt.sub(_amount);
+        ActivePoolUSDSDebtUpdated(USDSDebt);
     }
 
     // --- 'require' functions ---
@@ -130,7 +130,7 @@ contract ActivePool is Ownable, CheckContract, IActivePool {
 
     receive() external payable {
         _requireCallerIsBorrowerOperationsOrDefaultPool();
-        ETH = ETH.add(msg.value);
-        emit ActivePoolETHBalanceUpdated(ETH);
+        BNB = BNB.add(msg.value);
+        emit ActivePoolBNBBalanceUpdated(BNB);
     }
 }
