@@ -78,6 +78,9 @@ contract('StabilityPool - SABLE Rewards', async accounts => {
       // Check community issuance starts with 32 million SABLE
       communitySABLESupply = toBN(await sableToken.balanceOf(communityIssuanceTester.address))
       assert.isAtMost(getDifference(communitySABLESupply, '32000000000000000000000000'), 1000)
+
+      // Set rewardPerSec to 1e18/sec
+      await communityIssuanceTester.updateRewardPerSec('1000000000000000000');
     })
 
     it("liquidation after a deposit does change totalSABLEIssued", async () => {
@@ -276,7 +279,7 @@ contract('StabilityPool - SABLE Rewards', async accounts => {
       assert.isAtMost(getDifference((await sableToken.balanceOf(C)), C_SABLEGain_balance_expected), 1e12);
     })
 
-    // Simple case: 3 depositors, equal stake. No liquidations. No front-end. Update rewardPerSec
+    // Simple case: 3 depositors, equal stake. No liquidations. No front-end.
     it("withdrawFromSP(): Depositors with equal initial deposit withdraw correct SABLE gain. No liquidations. No front end. Update latestRewardPerSec", async () => {
       const initialIssuance = await communityIssuanceTester.totalSABLEIssued()
       assert.equal(initialIssuance, 0)

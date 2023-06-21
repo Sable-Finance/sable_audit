@@ -7,7 +7,7 @@ import "./ILiquityBase.sol";
 import "./IStabilityPool.sol";
 import "./IUSDSToken.sol";
 import "./ISABLEToken.sol";
-import "./ISABLEStaking.sol";
+import "./ISableStakingV2.sol";
 import "./IOracleRateCalculation.sol";
 import "./ICollSurplusPool.sol";
 import "./ISortedTroves.sol";

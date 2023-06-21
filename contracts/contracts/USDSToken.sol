@@ -17,11 +17,11 @@ import "./Dependencies/console.sol";
 *
 * --- Functionality added specific to the USDSToken ---
 * 
-* 1) Transfer protection: blacklist of addresses that are invalid recipients (i.e. core Liquity contracts) in external 
-* transfer() and transferFrom() calls. The purpose is to protect users from losing tokens by mistakenly sending USDS directly to a Liquity 
+* 1) Transfer protection: blacklist of addresses that are invalid recipients (i.e. core Sable contracts) in external 
+* transfer() and transferFrom() calls. The purpose is to protect users from losing tokens by mistakenly sending USDS directly to a Sable 
 * core contract, when they should rather call the right function. 
 *
-* 2) sendToPool() and returnFromPool(): functions callable only Liquity core contracts, which move USDS tokens between Liquity <-> user.
+* 2) sendToPool() and returnFromPool(): functions callable only Sable core contracts, which move USDS tokens between Sable <-> user.
 */
 
 contract USDSToken is CheckContract, IUSDSToken {

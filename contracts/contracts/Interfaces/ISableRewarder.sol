@@ -2,7 +2,7 @@
 
 pragma solidity 0.6.11;
 
-interface ICommunityIssuance { 
+interface ISableRewarder { 
     
     // --- Events ---
     
@@ -19,9 +19,7 @@ interface ICommunityIssuance {
         uint256 _latestRewardPerSec
     ) external;
 
-    function issueSABLE() external returns (uint);
-
-    function sendSABLE(address _account, uint _SABLEamount) external;
+    function issueSABLE() external;
 
     function balanceSABLE() external returns (uint);
 

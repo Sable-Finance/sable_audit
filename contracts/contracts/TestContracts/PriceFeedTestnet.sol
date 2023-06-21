@@ -12,7 +12,6 @@ import "../Dependencies/console.sol";
 * variable. The contract does not connect to a live Chainlink price feed. 
 */
 contract PriceFeedTestnet is IPriceFeed {
-    
     uint256 private _price = 200 * 1e18;
 
     IPriceFeed.FetchPriceResult private _fetchPriceResult = IPriceFeed.FetchPriceResult({
@@ -27,7 +26,14 @@ contract PriceFeedTestnet is IPriceFeed {
     address borrowerOperationsAddress;
     address troveManagerAddress;
     address stabilityPoolAddress;
-
+    address public owner;
+    modifier onlyOwner() {
+      require(msg.sender == owner, "Only the owner can call this function.");
+      _;
+    }
+    constructor() public {
+      owner = msg.sender;
+    }
     // --- Functions ---
 
     // View price getter for simplicity in tests
@@ -67,7 +73,7 @@ contract PriceFeedTestnet is IPriceFeed {
     }
 
     // Manual external price setter.
-    function setPrice(uint256 price) external returns (bool) {
+    function setPrice(uint256 price) external onlyOwner returns (bool) {
         _price = price;
         _fetchPriceResult.price = _price;
         return true;

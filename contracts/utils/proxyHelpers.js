@@ -387,7 +387,7 @@ class TokenProxy extends Proxy {
   }
 }
 
-class SABLEStakingProxy extends Proxy {
+class SableStakingV2Proxy extends Proxy {
   constructor(owner, proxies, tokenScriptAddress, token) {
     super(owner, proxies, tokenScriptAddress, token)
   }
@@ -413,5 +413,5 @@ module.exports = {
   StabilityPoolProxy,
   SortedTrovesProxy,
   TokenProxy,
-  SABLEStakingProxy
+  SableStakingV2Proxy
 }

@@ -10,14 +10,14 @@ import "../Interfaces/IBorrowerOperations.sol";
 import "../Interfaces/ITroveManager.sol";
 import "../Interfaces/IStabilityPool.sol";
 import "../Interfaces/IPriceFeed.sol";
-import "../Interfaces/ISABLEStaking.sol";
+import "../Interfaces/ISableStakingV2.sol";
 import "../Interfaces/IOracleRateCalculation.sol";
 import "./BorrowerOperationsScript.sol";
 import "./BNBTransferScript.sol";
-import "./SABLEStakingScript.sol";
+import "./SableStakingV2Script.sol";
 import "../Dependencies/console.sol";
 
-contract BorrowerWrappersScript is BorrowerOperationsScript, BNBTransferScript, SABLEStakingScript {
+contract BorrowerWrappersScript is BorrowerOperationsScript, BNBTransferScript, SableStakingV2Script {
     using SafeMath for uint;
 
     string constant public NAME = "BorrowerWrappersScript";
@@ -27,7 +27,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, BNBTransferScript, 
     IPriceFeed immutable priceFeed;
     IERC20 immutable usdsToken;
     IERC20 immutable sableToken;
-    ISABLEStaking immutable sableStaking;
+    ISableStakingV2 immutable sableStaking;
     IOracleRateCalculation immutable oracleRateCalc;
 
     constructor(
@@ -36,7 +36,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, BNBTransferScript, 
         address _sableStakingAddress
     )
         BorrowerOperationsScript(IBorrowerOperations(_borrowerOperationsAddress))
-        SABLEStakingScript(_sableStakingAddress)
+        SableStakingV2Script(_sableStakingAddress)
         public
     {
         checkContract(_troveManagerAddress);
@@ -59,8 +59,8 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, BNBTransferScript, 
         checkContract(sableTokenCached);
         sableToken = IERC20(sableTokenCached);
 
-        ISABLEStaking sableStakingCached = troveManagerCached.sableStaking();
-        require(_sableStakingAddress == address(sableStakingCached), "BorrowerWrappersScript: Wrong SABLEStaking address");
+        ISableStakingV2 sableStakingCached = troveManagerCached.sableStaking();
+        require(_sableStakingAddress == address(sableStakingCached), "BorrowerWrappersScript: Wrong SableStaking address");
         sableStaking = sableStakingCached;
 
         IOracleRateCalculation oracleRateCalcCached = troveManagerCached.oracleRateCalc();

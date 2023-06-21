@@ -7,7 +7,7 @@ import "./ILiquityBase.sol";
 import "./IStabilityPool.sol";
 import "./IUSDSToken.sol";
 import "./ISABLEToken.sol";
-import "./ISABLEStaking.sol";
+import "./ISableStakingV2.sol";
 import "./IOracleRateCalculation.sol";
 import "./ICollSurplusPool.sol";
 import "./ISortedTroves.sol";
@@ -140,7 +140,7 @@ interface ITroveManager is ILiquityBase {
         IActivePool activePool;
         IDefaultPool defaultPool;
         IUSDSToken usdsToken;
-        ISABLEStaking sableStaking;
+        ISableStakingV2 sableStaking;
         ISortedTroves sortedTroves;
         ICollSurplusPool collSurplusPool;
         address gasPoolAddress;
@@ -209,7 +209,7 @@ interface ITroveManager is ILiquityBase {
 
     function sableToken() external view returns (ISABLEToken);
 
-    function sableStaking() external view returns (ISABLEStaking);
+    function sableStaking() external view returns (ISableStakingV2);
 
     function oracleRateCalc() external view returns (IOracleRateCalculation);
 

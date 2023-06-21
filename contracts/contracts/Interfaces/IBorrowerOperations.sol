@@ -19,7 +19,7 @@ interface IBorrowerOperations {
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
     event USDSTokenAddressChanged(address _usdsTokenAddress);
-    event SABLEStakingAddressChanged(address _sableStakingAddress);
+    event SableStakingAddressChanged(address _sableStakingAddress);
     event OracleRateCalcAddressChanged(address _oracleRateCalcAddress);
 
     event TroveCreated(address indexed _borrower, uint arrayIndex);

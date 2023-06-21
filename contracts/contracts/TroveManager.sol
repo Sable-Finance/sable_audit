@@ -20,7 +20,7 @@ contract TroveManager is LiquityBase, CheckContract, Ownable, ITroveManager {
 
     ISABLEToken public override sableToken;
 
-    ISABLEStaking public override sableStaking;
+    ISableStakingV2 public override sableStaking;
 
     // A doubly linked list of Troves, sorted by their sorted by their collateral ratios
     ISortedTroves public sortedTroves;
@@ -42,7 +42,7 @@ contract TroveManager is LiquityBase, CheckContract, Ownable, ITroveManager {
     uint public constant MAX_BORROWING_FEE = (DECIMAL_PRECISION / 100) * 5; // 5%
 
     // During bootsrap period redemptions are not allowed
-    uint public constant BOOTSTRAP_PERIOD = 14 days;
+    uint public constant BOOTSTRAP_PERIOD = 0 days;
 
     /*
      * BETA: 18 digit decimal. Parameter by which to divide the redeemed fraction, in order to calc the new base rate from a redemption.
@@ -115,7 +115,7 @@ contract TroveManager is LiquityBase, CheckContract, Ownable, ITroveManager {
         usdsToken = IUSDSToken(param.usdsTokenAddress);
         sortedTroves = ISortedTroves(param.sortedTrovesAddress);
         sableToken = ISABLEToken(param.sableTokenAddress);
-        sableStaking = ISABLEStaking(param.sableStakingAddress);
+        sableStaking = ISableStakingV2(param.sableStakingAddress);
         systemState = ISystemState(param.systemStateAddress);
         oracleRateCalc = IOracleRateCalculation(param.oracleRateCalcAddress);
         troveHelper = ITroveHelper(param.troveHelperAddress);
@@ -387,7 +387,7 @@ contract TroveManager is LiquityBase, CheckContract, Ownable, ITroveManager {
             activePool,
             defaultPool,
             IUSDSToken(address(0)),
-            ISABLEStaking(address(0)),
+            ISableStakingV2(address(0)),
             sortedTroves,
             ICollSurplusPool(address(0)),
             address(0)

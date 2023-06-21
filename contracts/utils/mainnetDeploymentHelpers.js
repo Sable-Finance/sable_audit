@@ -137,7 +137,7 @@ class MainnetDeploymentHelper {
   }
 
   async deploySABLEContractsMainnet(bountyAddress, lpRewardsAddress, multisigAddress, deploymentState) {
-    const sableStakingFactory = await this.getFactory("SABLEStaking")
+    const sableStakingFactory = await this.getFactory("SableStakingV2")
     const lockupContractFactory_Factory = await this.getFactory("LockupContractFactory")
     const communityIssuanceFactory = await this.getFactory("CommunityIssuance")
     const sableTokenFactory = await this.getFactory("SABLEToken")

@@ -17,33 +17,15 @@ import "../Dependencies/console.sol";
 *
 *  --- Functionality added specific to the SABLEToken ---
 * 
-* 1) Transfer protection: blacklist of addresses that are invalid recipients (i.e. core Liquity contracts) in external 
-* transfer() and transferFrom() calls. The purpose is to protect users from losing tokens by mistakenly sending SABLE directly to a Liquity
+* 1) Transfer protection: blacklist of addresses that are invalid recipients (i.e. core Sable contracts) in external 
+* transfer() and transferFrom() calls. The purpose is to protect users from losing tokens by mistakenly sending SABLE directly to a Sable
 * core contract, when they should rather call the right function.
 *
-* 2) sendToSABLEStaking(): callable only by Liquity core contracts, which move SABLE tokens from user -> SABLEStaking contract.
+* 2) sendToSABLEStaking(): callable only by Sable core contracts, which move SABLE tokens from user -> SABLEStaking contract.
 *
 * 3) Supply hard-capped at 100 million
 *
-* 4) CommunityIssuance and LockupContractFactory addresses are set at deployment
-*
-* 5) The bug bounties / hackathons allocation of 2 million tokens is minted at deployment to an EOA
-
-* 6) 32 million tokens are minted at deployment to the CommunityIssuance contract
-*
-* 7) The LP rewards allocation of (1 + 1/3) million tokens is minted at deployent to a Staking contract
-*
-* 8) (64 + 2/3) million tokens are minted at deployment to the Liquity multisig
-*
-* 9) Until one year from deployment:
-* -Liquity multisig may only transfer() tokens to LockupContracts that have been deployed via & registered in the 
-*  LockupContractFactory 
-* -approve(), increaseAllowance(), decreaseAllowance() revert when called by the multisig
-* -transferFrom() reverts when the multisig is the sender
-* -sendToSABLEStaking() reverts when the multisig is the sender, blocking the multisig from staking its SABLE.
-* 
-* After one year has passed since deployment of the SABLEToken, the restrictions on multisig operations are lifted
-* and the multisig has the same rights as any other address.
+* 4) CommunityIssuance address is set at deployment
 */
 
 contract SABLEToken is CheckContract, ISABLEToken {
@@ -85,18 +67,21 @@ contract SABLEToken is CheckContract, ISABLEToken {
 
     address public immutable sableStakingAddress;
 
+    address public immutable sableRewarderAddress;
+
     // --- Events ---
 
     event SABLEStakingAddressSet(address _sableStakingAddress);
 
     // --- Functions ---
 
-    constructor(address _sableStakingAddress, address _vaultAddress, uint256 _mintAmount) public {
+    constructor(address _sableStakingAddress, address _sableRewarderAddress, address _vaultAddress, uint256 _mintAmount) public {
         checkContract(_sableStakingAddress);
 
         deploymentStartTime = block.timestamp;
 
         sableStakingAddress = _sableStakingAddress;
+        sableRewarderAddress = _sableRewarderAddress;
 
         bytes32 hashedName = keccak256(bytes(_NAME));
         bytes32 hashedVersion = keccak256(bytes(_VERSION));
@@ -186,12 +171,7 @@ contract SABLEToken is CheckContract, ISABLEToken {
         );
         return true;
     }
-
-    function sendToSABLEStaking(address _sender, uint256 _amount) external override {
-        _requireCallerIsSABLEStaking();
-        _transfer(_sender, sableStakingAddress, _amount);
-    }
-
+    
     // --- EIP 2612 functionality ---
 
     function domainSeparator() public view override returns (bytes32) {
@@ -281,19 +261,14 @@ contract SABLEToken is CheckContract, ISABLEToken {
             _recipient != address(0) && _recipient != address(this),
             "SABLE: Cannot transfer tokens directly to the SABLE token contract or the zero address"
         );
-        require(
-            _recipient != sableStakingAddress,
-            "SABLE: Cannot transfer tokens directly to the community issuance or staking contract"
-        );
+        if (msg.sender != sableRewarderAddress) {
+            require(
+                _recipient != sableStakingAddress,
+                "SABLE: Cannot transfer tokens directly to staking contract"
+            );
+        }
     }
 
-
-    function _requireCallerIsSABLEStaking() internal view {
-        require(
-            msg.sender == sableStakingAddress,
-            "SABLEToken: caller must be the SABLEStaking contract"
-        );
-    }
 
     // --- Optional functions ---
 

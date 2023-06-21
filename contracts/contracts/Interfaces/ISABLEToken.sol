@@ -14,8 +14,6 @@ interface ISABLEToken is IERC20, IERC2612 {
 
     // --- Functions ---
     
-    function sendToSABLEStaking(address _sender, uint256 _amount) external;
-
     function getDeploymentStartTime() external view returns (uint256);
 
 }

@@ -9,7 +9,7 @@ const StabilityPool = artifacts.require("./StabilityPool.sol")
 const FunctionCaller = artifacts.require("./FunctionCaller.sol")
 const BorrowerOperations = artifacts.require("./BorrowerOperations.sol")
 
-const SABLEStaking = artifacts.require("./SABLE/SABLEStaking.sol")
+const SableStakingV2 = artifacts.require("./SABLE/SableStakingV2.sol")
 const SABLEToken = artifacts.require("./SABLE/SABLEToken.sol")
 const CommunityIssuance = artifacts.require("./SABLE/CommunityIssuance.sol")
 const HintHelpers = artifacts.require("./HintHelpers.sol")
@@ -41,7 +41,7 @@ const coreContractABIs = [
 ]
 
 const SABLEContractABIs = [
-  SABLEStaking,
+  SableStakingV2,
   SABLEToken,
   LockupContractFactory,
   CommunityIssuance

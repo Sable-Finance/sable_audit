@@ -78,6 +78,9 @@ contract('SABLEStaking revenue share tests', async accounts => {
 
     // funding PriceFeed contract
     await web3.eth.sendTransaction({from: funder, to: priceFeed.address, value: 1000000000})
+
+    // set LP token address to be sable token address for ease
+    await sableStaking.setSableLPAddress(sableToken.address)
   })
 
   it('stake(): reverts if amount is zero', async () => {

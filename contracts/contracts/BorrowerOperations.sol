@@ -8,7 +8,7 @@ import "./Interfaces/ITroveManager.sol";
 import "./Interfaces/IUSDSToken.sol";
 import "./Interfaces/ICollSurplusPool.sol";
 import "./Interfaces/ISortedTroves.sol";
-import "./Interfaces/ISABLEStaking.sol";
+import "./Interfaces/ISableStakingV2.sol";
 import "./Interfaces/IOracleRateCalculation.sol";
 import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/Ownable.sol";
@@ -28,7 +28,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
 
     ICollSurplusPool collSurplusPool;
 
-    ISABLEStaking public sableStaking;
+    ISableStakingV2 public sableStaking;
     address public sableStakingAddress;
 
     IUSDSToken public usdsToken;
@@ -103,7 +103,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
     event USDSTokenAddressChanged(address _usdsTokenAddress);
-    event SABLEStakingAddressChanged(address _sableStakingAddress);
+    event SableStakingAddressChanged(address _sableStakingAddress);
     event SystemStateAddressChanged(address _systemStateAddress);
     event OracleRateCalcAddressChanged(address _oracleRateCalcAddress);
 
@@ -143,7 +143,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         sortedTroves = ISortedTroves(param.sortedTrovesAddress);
         usdsToken = IUSDSToken(param.usdsTokenAddress);
         sableStakingAddress = param.sableStakingAddress;
-        sableStaking = ISABLEStaking(param.sableStakingAddress);
+        sableStaking = ISableStakingV2(param.sableStakingAddress);
         systemState = ISystemState(param.systemStateAddress);
         oracleRateCalc = IOracleRateCalculation(param.oracleRateCalcAddress);
 
@@ -158,7 +158,7 @@ contract BorrowerOperations is LiquityBase, Ownable, CheckContract, IBorrowerOpe
         emit PriceFeedAddressChanged(param.priceFeedAddress);
         emit SortedTrovesAddressChanged(param.sortedTrovesAddress);
         emit USDSTokenAddressChanged(param.usdsTokenAddress);
-        emit SABLEStakingAddressChanged(param.sableStakingAddress);
+        emit SableStakingAddressChanged(param.sableStakingAddress);
         emit SystemStateAddressChanged(param.systemStateAddress);
         emit OracleRateCalcAddressChanged(param.oracleRateCalcAddress);
 

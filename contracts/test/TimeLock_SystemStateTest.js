@@ -34,6 +34,7 @@ contract("TimeLock-SystemState", async accounts => {
   let systemState;
   let timeLock;
   let stabilityPool;
+  let communityIssuance;
 
   let minDelay;
 
@@ -48,6 +49,7 @@ contract("TimeLock-SystemState", async accounts => {
     systemState = contracts.systemState;
     timeLock = contracts.timeLock;
     stabilityPool = contracts.stabilityPool;
+    communityIssuance = SABLEContracts.communityIssuance;
 
     ;
     await deploymentHelper.connectCoreContracts(contracts, SABLEContracts);

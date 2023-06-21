@@ -16,7 +16,8 @@ const MockPyth = artifacts.require("./MockPyth.sol");
 const OracleRateCalculation = artifacts.require("./OracleRateCalculation.sol");
 const TroveHelper = artifacts.require("./TroveHelper.sol");
 
-const SABLEStaking = artifacts.require("./SABLEStaking.sol");
+const SableStakingV2 = artifacts.require("./SableStakingV2.sol");
+const SableRewarder = artifacts.require("./SableRewarder.sol");
 const SABLEToken = artifacts.require("./SABLEToken.sol");
 const CommunityIssuance = artifacts.require("./CommunityIssuance.sol");
 
@@ -36,7 +37,7 @@ const BorrowerWrappersScript = artifacts.require("BorrowerWrappersScript");
 const TroveManagerScript = artifacts.require("TroveManagerScript");
 const StabilityPoolScript = artifacts.require("StabilityPoolScript");
 const TokenScript = artifacts.require("TokenScript");
-const SABLEStakingScript = artifacts.require("SABLEStakingScript");
+const SableStakingV2Script = artifacts.require("SableStakingV2Script");
 const testHelpers = require("./testHelpers.js");
 
 const hardHatAddressDeployDefault = "0x31c57298578f7508B5982062cfEc5ec8BD346247";
@@ -50,7 +51,7 @@ const {
   StabilityPoolProxy,
   SortedTrovesProxy,
   TokenProxy,
-  SABLEStakingProxy
+  SableStakingV2Proxy
 } = require("../utils/proxyHelpers.js");
 
 /* "Liquity core" consists of all contracts in the core Liquity system.
@@ -59,7 +60,7 @@ SABLE contracts consist of only those contracts related to the SABLE Token:
 
 -the SABLE token
 -the Lockup factory and lockup contracts
--the SABLEStaking contract
+-the SableStakingV2 contract
 -the CommunityIssuance contract 
 */
 
@@ -198,15 +199,17 @@ class DeploymentHelper {
   }
 
   static async deploySABLEContractsHardhat(vaultAddress, mintAmount) {
-    const sableStaking = await SABLEStaking.new();
+    const sableStaking = await SableStakingV2.new();
     const communityIssuance = await CommunityIssuance.new();
+    const sableRewarder = await SableRewarder.new();
 
-    SABLEStaking.setAsDeployed(sableStaking);
+    SableStakingV2.setAsDeployed(sableStaking);
     CommunityIssuance.setAsDeployed(communityIssuance);
-
-    // Deploy SABLE Token, passing Community Issuance and Factory addresses to the constructor
+    SableRewarder.setAsDeployed(sableRewarder);
+    // Deploy SABLE Token, passing staking, rewarder, and token vault addresses to the constructor
     const sableToken = await SABLEToken.new(
       sableStaking.address,
+      sableRewarder.address,
       vaultAddress,
       mintAmount
     );
@@ -215,21 +218,25 @@ class DeploymentHelper {
     const SABLEContracts = {
       sableStaking,
       communityIssuance,
+      sableRewarder,
       sableToken
     };
     return SABLEContracts;
   }
 
   static async deploySABLETesterContractsHardhat(vaultAddress, mintAmount) {
-    const sableStaking = await SABLEStaking.new();
+    const sableStaking = await SableStakingV2.new();
+    const sableRewarder = await SableRewarder.new();
     const communityIssuance = await CommunityIssuanceTester.new();
 
-    SABLEStaking.setAsDeployed(sableStaking);
+    SableStakingV2.setAsDeployed(sableStaking);
+    SableRewarder.setAsDeployed(sableRewarder);
     CommunityIssuanceTester.setAsDeployed(communityIssuance);
 
     // Deploy SABLE Token, passing Community Issuance and Factory addresses to the constructor
     const sableToken = await SABLETokenTester.new(
       sableStaking.address,
+      sableRewarder.address,
       vaultAddress,
       mintAmount
     );
@@ -237,6 +244,7 @@ class DeploymentHelper {
 
     const SABLEContracts = {
       sableStaking,
+      sableRewarder,
       communityIssuance,
       sableToken
     };
@@ -295,11 +303,13 @@ class DeploymentHelper {
   static async deploySABLEContractsTruffle(vaultAddress, mintAmount) {
     const sableStaking = await sableStaking.new();
     const communityIssuance = await CommunityIssuance.new();
+    const sableRewarder = await sableRewarder.new();
 
-    /* Deploy SABLE Token, passing Community Issuance,  SABLEStaking, and Factory addresses 
+    /* Deploy SABLE Token, passing staking, rewarder, and token vault addresses 
     to the constructor  */
     const sableToken = await SABLEToken.new(
       sableStaking.address,
+      sableRewarder.address,
       vaultAddress,
       mintAmount
     );
@@ -307,6 +317,7 @@ class DeploymentHelper {
     const SABLEContracts = {
       sableStaking,
       communityIssuance,
+      sableRewarder,
       sableToken
     };
     return SABLEContracts;
@@ -388,8 +399,8 @@ class DeploymentHelper {
       SABLEContracts.sableToken
     );
 
-    const sableStakingScript = await SABLEStakingScript.new(SABLEContracts.sableStaking.address);
-    SABLEContracts.sableStaking = new SABLEStakingProxy(
+    const sableStakingScript = await SableStakingV2Script.new(SABLEContracts.sableStaking.address);
+    SABLEContracts.sableStaking = new SableStakingV2Proxy(
       owner,
       proxies,
       sableStakingScript.address,
@@ -518,13 +529,20 @@ class DeploymentHelper {
       coreContracts.usdsToken.address,
       coreContracts.troveManager.address,
       coreContracts.borrowerOperations.address,
+      SABLEContracts.sableRewarder.address,
       coreContracts.activePool.address
     );
 
     await SABLEContracts.communityIssuance.setParams(
       SABLEContracts.sableToken.address,
       coreContracts.stabilityPool.address,
-      toBN(1e18).toString()
+      toBN(0e18).toString()
+    );
+
+    await SABLEContracts.sableRewarder.setParams(
+      SABLEContracts.sableToken.address,
+      coreContracts.stabilityPool.address,
+      toBN(0e18).toString()
     );
   }
 

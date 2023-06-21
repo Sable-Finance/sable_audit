@@ -49,11 +49,6 @@ contract OwnableTransfer {
         return msg.sender == _owner;
     }
 
-    function transferOwnership(address _newOwner) public onlyOwner {
-        emit OwnershipTransferred(_owner, _newOwner);
-        _owner = _newOwner;
-    }
-
     /**
      * @dev Leaves the contract without owner. It will not be possible to call
      * `onlyOwner` functions anymore.
@@ -67,5 +62,10 @@ contract OwnableTransfer {
     function _renounceOwnership() internal {
         emit OwnershipTransferred(_owner, address(0));
         _owner = address(0);
+    }
+
+    function _transferOwnership(address newOwner) internal {
+        emit OwnershipTransferred(_owner, newOwner);
+        _owner = newOwner;
     }
 }

@@ -7,9 +7,10 @@ import "../SABLE/SABLEToken.sol";
 contract SABLETokenTester is SABLEToken {
     constructor(
         address _sableStakingAddress,
+        address _sableRewarderAddress,
         address _vaultAddress,
         uint256 _mintAmount
-    ) public SABLEToken(_sableStakingAddress, _vaultAddress, _mintAmount) {}
+    ) public SABLEToken(_sableStakingAddress, _sableRewarderAddress, _vaultAddress, _mintAmount) {}
 
     function unprotectedMint(address account, uint256 amount) external {
         // No check for the caller here

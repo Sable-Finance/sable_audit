@@ -38,6 +38,7 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
     defaultPool = contracts.defaultPool
     borrowerOperations = contracts.borrowerOperations
     troveHelper = contracts.troveHelper
+    timeLock = contracts.timeLock
 
     sableStaking = SABLEContracts.sableStaking
     communityIssuance = SABLEContracts.communityIssuance

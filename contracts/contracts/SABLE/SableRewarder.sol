@@ -3,25 +3,25 @@
 pragma solidity 0.6.11;
 
 import "../Interfaces/ISABLEToken.sol";
-import "../Interfaces/ICommunityIssuance.sol";
-import "../Interfaces/IStabilityPool.sol";
+import "../Interfaces/ISableRewarder.sol";
+import "../Interfaces/ISableStakingV2.sol";
 import "../Dependencies/BaseMath.sol";
 import "../Dependencies/LiquityMath.sol";
 import "../Dependencies/OwnableTransfer.sol";
 import "../Dependencies/CheckContract.sol";
 import "../Dependencies/SafeMath.sol";
 
-contract CommunityIssuance is ICommunityIssuance, OwnableTransfer, CheckContract, BaseMath {
+contract SableRewarder is ISableRewarder, OwnableTransfer, CheckContract, BaseMath {
     using SafeMath for uint;
 
     // --- Data ---
 
-    string public constant NAME = "CommunityIssuance";
+    string public constant NAME = "SableRewarder";
 
     ISABLEToken public sableToken;
 
-    // address public stabilityPoolAddress;
-    IStabilityPool public stabilityPool;
+    ISableStakingV2 public sableStaking;
+    address public sableStakingAddress;
 
     uint public totalSABLEIssued;
     uint public immutable deploymentTime;
@@ -34,7 +34,7 @@ contract CommunityIssuance is ICommunityIssuance, OwnableTransfer, CheckContract
     // --- Events ---
 
     event SABLETokenAddressSet(address _sableTokenAddress);
-    event StabilityPoolAddressSet(address _stabilityPoolAddress);
+    event SableStakingAddressSet(address _sableStakingddress);
     event TotalSABLEIssuedUpdated(uint _totalSABLEIssued);
 
     // --- Functions ---
@@ -46,63 +46,67 @@ contract CommunityIssuance is ICommunityIssuance, OwnableTransfer, CheckContract
 
     function setParams(
         address _sableTokenAddress,
-        address _stabilityPoolAddress,
+        address _sableStakingAddress,
         uint256 _latestRewardPerSec
     ) external override onlyOwner {
         require(!initialized, "Contract instance already set param");
 
         checkContract(_sableTokenAddress);
-        checkContract(_stabilityPoolAddress);
+        checkContract(_sableStakingAddress);
 
         latestRewardPerSec = _latestRewardPerSec;
 
         sableToken = ISABLEToken(_sableTokenAddress);
-        stabilityPool = IStabilityPool(_stabilityPoolAddress);
+        sableStaking = ISableStakingV2(_sableStakingAddress);
+        sableStakingAddress = _sableStakingAddress;
 
         emit SABLETokenAddressSet(_sableTokenAddress);
-        emit StabilityPoolAddressSet(_stabilityPoolAddress);
+        emit SableStakingAddressSet(_sableStakingAddress);
         emit RewardPerSecUpdated(_latestRewardPerSec);
 
         initialized = true;
     }
 
-    function issueSABLE() external override returns (uint) {
-        _requireCallerIsStabilityPool();
+    function issueSABLE() external override {
+        _requireCallerIsSableStaking();
+        _issueSABLE();
+    }
 
+    function _issueSABLE() internal {
         uint timeSinceLastIssue = block.timestamp.sub(lastIssuanceTime);
         uint issuance = latestRewardPerSec.mul(timeSinceLastIssue);
         
         totalSABLEIssued = totalSABLEIssued.add(issuance);
         lastIssuanceTime = block.timestamp;
 
+        sendSABLE(issuance);
+        sableStaking.increaseF_SABLE(issuance);
+
         emit TotalSABLEIssuedUpdated(totalSABLEIssued);
-        return issuance;
     }
 
     function updateRewardPerSec(uint newRewardPerSec) external override onlyOwner {
-        stabilityPool.ownerTriggerIssuance();
+        _issueSABLE();
         require(lastIssuanceTime == block.timestamp);
         latestRewardPerSec = newRewardPerSec;
         emit RewardPerSecUpdated(newRewardPerSec);
     }
 
-    function sendSABLE(address _account, uint _SABLEamount) external override {
-        _requireCallerIsStabilityPool();
-
-        sableToken.transfer(_account, _SABLEamount);
+    function sendSABLE(uint _SABLEamount) internal {
+        sableToken.transfer(sableStakingAddress, _SABLEamount);
     }
 
     function balanceSABLE() external override returns (uint) {
         return sableToken.balanceOf(address(this));
     }
 
-    function transferOwnership(address _newOwner) onlyOwner external override {
-        _transferOwnership(_newOwner);
+    function transferOwnership(address newOwner) external override onlyOwner {
+        _transferOwnership(newOwner);
     }
 
     // --- 'require' functions ---
 
-    function _requireCallerIsStabilityPool() internal view {
-        require(msg.sender == address(stabilityPool), "CommunityIssuance: caller is not SP");
+    function _requireCallerIsSableStaking() internal view {
+        require(msg.sender == address(sableStaking), "SableRewarder: caller is not Staking");
     }
 }
