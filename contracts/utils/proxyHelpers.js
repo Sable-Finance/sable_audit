@@ -1,7 +1,10 @@
 const { TestHelper: th } = require("../utils/testHelpers.js")
+const { Interface } = require("@ethersproject/abi");
 
 const DSProxyFactory = artifacts.require('DSProxyFactory')
 const DSProxy = artifacts.require('DSProxy')
+const testHelpers = require("../utils/testHelpers.js")
+const DEFAULT_PRICE_FEED_DATA = testHelpers.DEFAULT_PRICE_FEED_DATA
 
 const buildUserProxies = async (users) => {
   const proxies = {}
@@ -68,14 +71,28 @@ class Proxy {
       return this.proxyFunction(signature.slice(0, signature.indexOf('(')), params)
     }
     const optionalParams = this.getOptionalParams(params)
-    const calldata = th.getTransactionData(signature, this.getSlicedParams(params))
+    // const calldata = th.getTransactionData(signature, this.getSlicedParams(params))
+    const iface = new Interface([`function ${signature}`]);
+    let encodeParams;
+    if (optionalParams) {
+      encodeParams = params.slice(0, params.length-1);
+    } else {
+      encodeParams = params;
+    }
+    for (let i = 0; i < encodeParams.length-1; i++) {
+      if (typeof encodeParams[i] == 'object') {
+        encodeParams[i] = web3.utils.toHex(encodeParams[i])
+      }
+    }
+    const calldata = iface.encodeFunctionData(signature.slice(0, signature.indexOf('(')), encodeParams);
+
     // console.log('proxy: ', proxy.address)
     // console.log(this.scriptAddress, calldata, optionalParams)
     return proxy.methods["execute(address,bytes)"](this.scriptAddress, calldata, optionalParams)
   }
 
   async proxyFunctionWithUser(functionName, user) {
-    return this.contract[functionName](this.getProxyAddressFromUser(user))
+    return this.contract[functionName](this.getProxyAddressFromUser(user), DEFAULT_PRICE_FEED_DATA)
   }
 
   async proxyFunction(functionName, params) {
@@ -394,6 +411,10 @@ class SableStakingV2Proxy extends Proxy {
 
   async stake(...params) {
     return this.forwardFunction(params, 'stake(uint256)')
+  }
+
+  async setSableLPAddress(...params) {
+    return this.forwardFunction(params, 'setSableLPAddress(address)')
   }
 
   async stakes(user) {

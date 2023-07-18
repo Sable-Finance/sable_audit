@@ -80,35 +80,55 @@ contract('CollSurplusPool', async accounts => {
     await th.assertRevert(borrowerOperations.claimCollateral({ from: A }), 'CollSurplusPool: No collateral available to claim')
   })
 
-  it.skip("CollSurplusPool: claimColl(): Reverts if owner cannot receive BNB surplus", async () => {
-    const nonPayable = await NonPayable.new()
+  it("CollSurplusPool: claimColl(): Reverts if owner cannot receive BNB surplus", async () => {
+    const nonPayable = await NonPayable.new();
 
-    const price = toBN(dec(100, 18))
-    await priceFeed.setPrice(price)
+    const price = toBN(dec(100, 18));
+    await priceFeed.setPrice(price);
 
     // open trove from NonPayable proxy contract
-    const B_coll = toBN(dec(60, 18))
-    const B_usdsAmount = toBN(dec(3000, 18))
-    const B_netDebt = await th.getAmountWithBorrowingFee(contracts, B_usdsAmount, DEFAULT_ORACLE_RATE)
-    // const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address,bytes[])', ['0xde0b6b3a7640000', web3.utils.toHex(B_usdsAmount), B, B, DEFAULT_PRICE_FEED_DATA])
-    // const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address)', ['0xde0b6b3a7640000', web3.utils.toHex(B_usdsAmount), B, B])
-    const signature = web3.utils.toHex('openTrove(uint256,uint256,address,address)')
-    const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address)', [signature, web3.utils.toHex(B_usdsAmount), B, B, DEFAULT_PRICE_FEED_DATA])
-    await nonPayable.forward(borrowerOperations.address, openTroveData, { value: B_coll })
-    await openTrove({ extraUSDSAmount: B_netDebt, extraParams: { from: A, value: dec(3000, 'ether') } })
+    const B_coll = toBN(dec(60, 18));
+    const B_usdsAmount = toBN(dec(3000, 18));
+    const B_netDebt = await th.getAmountWithBorrowingFee(
+      contracts,
+      B_usdsAmount,
+      DEFAULT_ORACLE_RATE
+    );
+    const openTroveData = th
+      .getTransactionData("openTrove(uint256,uint256,address,address,bytes[])", [
+        "0xde0b6b3a7640000",
+        web3.utils.toHex(B_usdsAmount),
+        B,
+        B
+      ])
+      .concat(
+        "00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000039b"
+      )
+      .concat(DEFAULT_PRICE_FEED_DATA[0].slice(2));
+    await nonPayable.forward(borrowerOperations.address, openTroveData, {
+      value: B_coll,
+      gas: 15000000
+    });
+    await openTrove({
+      extraUSDSAmount: B_netDebt,
+      extraParams: { from: A, value: dec(3000, "ether") }
+    });
 
     // skip bootstrapping phase
-    await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
+    await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // At BNB:USD = 100, this redemption should leave 1 ether of coll surplus for B
-    await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt)
+    await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt);
 
-    const BNB_2 = await collSurplusPool.getBNB()
-    th.assertIsApproximatelyEqual(BNB_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)))
+    const BNB_2 = await collSurplusPool.getBNB();
+    th.assertIsApproximatelyEqual(BNB_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)));
 
-    const claimCollateralData = th.getTransactionData('claimCollateral()', [])
-    await th.assertRevert(nonPayable.forward(borrowerOperations.address, claimCollateralData), 'CollSurplusPool: sending BNB failed')
-  })
+    const claimCollateralData = th.getTransactionData("claimCollateral()", []);
+    await th.assertRevert(
+      nonPayable.forward(borrowerOperations.address, claimCollateralData),
+      "CollSurplusPool: sending BNB failed"
+    );
+  });
 
   it('CollSurplusPool: reverts trying to send BNB to it', async () => {
     await th.assertRevert(web3.eth.sendTransaction({ from: A, to: collSurplusPool.address, value: 1 }), 'CollSurplusPool: Caller is not Active Pool')

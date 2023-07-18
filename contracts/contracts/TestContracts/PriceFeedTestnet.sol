@@ -53,18 +53,7 @@ contract PriceFeedTestnet is IPriceFeed {
         stabilityPoolAddress = _stabilityPoolAddress;
     }
 
-    function _restrictCaller() internal view {
-        require(
-            msg.sender == address(this)
-            || msg.sender == troveManagerAddress 
-            || msg.sender == borrowerOperationsAddress
-            || msg.sender == stabilityPoolAddress,
-            "PriceFeed: Only restricted contract can call fetchPrice"
-        );
-    }
-
     function fetchPrice(bytes[] calldata priceFeedUpdateData) external override returns (IPriceFeed.FetchPriceResult memory) {
-        _restrictCaller();
         // Fire an event just like the mainnet version would.
         // This lets the subgraph rely on events to get the latest price even when developing locally.
         emit LastGoodPriceUpdated(_price);

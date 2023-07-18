@@ -15,6 +15,7 @@ const timeValues = testHelpers.TimeValues;
 
 const ZERO_ADDRESS = th.ZERO_ADDRESS;
 const assertRevert = th.assertRevert;
+const assertAssertRevert = th.assertAssertRevert;
 
 const DEFAULT_PRICE_FEED_DATA = testHelpers.DEFAULT_PRICE_FEED_DATA
 const DEFAULT_ORACLE_RATE = testHelpers.DEFAULT_ORACLE_RATE
@@ -66,6 +67,7 @@ contract("BorrowerOperations", async accounts => {
   let sableStaking;
   let sableToken;
   let systemState;
+  let mockSableLP;
 
   let contracts;
 
@@ -96,6 +98,8 @@ contract("BorrowerOperations", async accounts => {
         vaultAddress,
         MINT_AMOUNT
       );
+
+      mockSableLP = await deploymentHelper.deployMockSableLP(vaultAddress, MINT_AMOUNT);
 
       await deploymentHelper.connectCoreContracts(contracts, SABLEContracts);
       await deploymentHelper.connectSABLEContractsToCore(SABLEContracts, contracts);
@@ -1236,9 +1240,11 @@ contract("BorrowerOperations", async accounts => {
     });
 
     it("withdrawUSDS(): borrowing at non-zero base rate sends USDS fee to SABLE staking contract", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
       await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE USDS balance before == 0
@@ -1289,10 +1295,12 @@ contract("BorrowerOperations", async accounts => {
     if (!withProxy) {
       // TODO: use rawLogs instead of logs
       it("withdrawUSDS(): borrowing at non-zero base records the (drawn debt + fee) on the Trove struct", async () => {
-        // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
-        await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-        await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
-        await sableStaking.stake(dec(1, 18), { from: vaultAddress })
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
+      // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
         await openTrove({ ICR: toBN(dec(10, 18)), extraParams: { from: whale } });
         await openTrove({
@@ -1354,9 +1362,11 @@ contract("BorrowerOperations", async accounts => {
     }
 
     it("withdrawUSDS(): Borrowing at non-zero base rate increases the SABLE staking contract USDS fees-per-unit-staked", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
       await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE contract USDS fees-per-unit-staked is zero
@@ -1405,9 +1415,11 @@ contract("BorrowerOperations", async accounts => {
     });
 
     it("withdrawUSDS(): Borrowing at non-zero base rate sends requested amount to the user", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
       await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE Staking contract balance before == 0
@@ -1489,8 +1501,12 @@ contract("BorrowerOperations", async accounts => {
       const baseRate_1 = await troveManager.baseRate();
       assert.equal(baseRate_1, "0");
 
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
+
       // A artificially receives SABLE, then stakes it
-      await sableToken.unprotectedMint(A, dec(100, 18));
+      await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(100, 18), { from: A })
       await sableStaking.stake(dec(100, 18), { from: A });
 
       // 2 hours pass
@@ -2489,9 +2505,11 @@ contract("BorrowerOperations", async accounts => {
     });
 
     it("adjustTrove(): borrowing at non-zero base rate sends USDS fee to SABLE staking contract", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
       await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE USDS balance before == 0
@@ -2541,9 +2559,11 @@ contract("BorrowerOperations", async accounts => {
     if (!withProxy) {
       // TODO: use rawLogs instead of logs
       it("adjustTrove(): borrowing at non-zero base records the (drawn debt + fee) on the Trove struct", async () => {
+        // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+        await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
         // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
         await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-        await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+        await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
         await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
         await openTrove({ ICR: toBN(dec(10, 18)), extraParams: { from: whale } });
@@ -2609,9 +2629,11 @@ contract("BorrowerOperations", async accounts => {
     }
 
     it("adjustTrove(): Borrowing at non-zero base rate increases the SABLE staking contract USDS fees-per-unit-staked", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
       await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE contract USDS fees-per-unit-staked is zero
@@ -2669,9 +2691,11 @@ contract("BorrowerOperations", async accounts => {
     });
 
     it("adjustTrove(): Borrowing at non-zero base rate sends requested amount to the user", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
       await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE Staking contract balance before == 0
@@ -2819,8 +2843,12 @@ contract("BorrowerOperations", async accounts => {
       // 2 hours pass
       th.fastForwardTime(7200, web3.currentProvider);
 
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
+
       // A artificially receives SABLE, then stakes it
-      await sableToken.unprotectedMint(A, dec(100, 18));
+      await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(100, 18), { from: A })
       await sableStaking.stake(dec(100, 18), { from: A });
 
       // Check staking USDS balance before == 0
@@ -3227,7 +3255,7 @@ contract("BorrowerOperations", async accounts => {
           from: bob,
           value: bobCollIncrease
         }),
-        " BorrowerOps: Operation must leave trove with ICR >= CCR"
+        "BorrowerOps: Operation must leave trove with ICR >= CCR"
       );
     });
 
@@ -3365,8 +3393,12 @@ contract("BorrowerOperations", async accounts => {
 
       assert.isTrue(await th.checkRecoveryMode(contracts));
 
-      // B stakes SABLE
-      await sableToken.unprotectedMint(bob, dec(100, 18));
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
+
+      // bob stakes SABLE
+      await mockSableLP.transfer(bob, dec(100, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(100, 18), { from: bob })
       await sableStaking.stake(dec(100, 18), { from: bob });
 
       const sableStakingUSDSBalanceBefore = await usdsToken.balanceOf(sableStaking.address);
@@ -4297,7 +4329,7 @@ contract("BorrowerOperations", async accounts => {
 
     if (!withProxy) {
       // no need to test this with proxies
-      it("Internal _adjustTrove(): reverts when op is a withdrawal and _borrower param is not the msg.sender", async () => {
+      it("Internal _adjustTrove(): reverts when op is a withdrawal and _borrower param does not match msg.sender", async () => {
         await openTrove({
           extraUSDSAmount: toBN(dec(10000, 18)),
           ICR: toBN(dec(10, 18)),
@@ -4310,38 +4342,31 @@ contract("BorrowerOperations", async accounts => {
         });
 
         const txPromise_A = borrowerOperations.callInternalAdjustLoan(
-          alice,
-          dec(1, 18),
-          dec(1, 18),
-          true,
-          alice,
-          alice,
-          DEFAULT_PRICE_FEED_DATA,
-          { from: bob }
-        );
-        await assertRevert(txPromise_A, "BorrowerOps: Caller must be the borrower for a withdrawal");
-        const txPromise_B = borrowerOperations.callInternalAdjustLoan(
           bob,
-          dec(1, 18),
-          dec(1, 18),
-          true,
-          alice,
-          alice,
+          bob,
+          bob,
           DEFAULT_PRICE_FEED_DATA,
-          { from: owner }
+          { from: alice }
         );
-        await assertRevert(txPromise_B, "BorrowerOps: Caller must be the borrower for a withdrawal");
-        const txPromise_C = borrowerOperations.callInternalAdjustLoan(
-          carol,
-          dec(1, 18),
-          dec(1, 18),
-          true,
-          alice,
-          alice,
+
+        // before solidity 0.8.0, assertion failure returns "invalid opcode" instead having a revert msg
+        await assertAssertRevert(txPromise_A, "invalid opcode");
+        const txPromise_B = borrowerOperations.callInternalAdjustLoan(
+          whale,
+          bob,
+          bob,
           DEFAULT_PRICE_FEED_DATA,
           { from: bob }
         );
-        await assertRevert(txPromise_C, "BorrowerOps: Caller must be the borrower for a withdrawal");
+        await assertAssertRevert(txPromise_B, "invalid opcode");
+        const txPromise_C = borrowerOperations.callInternalAdjustLoan(
+          alice,
+          bob,
+          bob,
+          DEFAULT_PRICE_FEED_DATA,
+          { from: whale }
+        );
+        await assertRevert(txPromise_C, "BorrowerOps: Trove does not exist or is closed");
       });
     }
 
@@ -4779,16 +4804,18 @@ contract("BorrowerOperations", async accounts => {
         assert.isTrue(aliceColl.gt(toBN("0")));
 
         const alice_BNBBalance_Before = web3.utils.toBN(await web3.eth.getBalance(alice));
-
         // to compensate borrowing fees
         await usdsToken.transfer(alice, await usdsToken.balanceOf(dennis), { from: dennis });
 
-        await borrowerOperations.closeTrove(DEFAULT_PRICE_FEED_DATA, { from: alice, gasPrice: 0 });
+        // pre-defining gas fee to ensure a predictable BNB balance deduction
+        const gasPrice = 10
+        aliceCloseTroveTx = await borrowerOperations.closeTrove(DEFAULT_PRICE_FEED_DATA, { from: alice, gasPrice: gasPrice });
+        const gasUsed = toBN(aliceCloseTroveTx.receipt.gasUsed * gasPrice)
 
         const alice_BNBBalance_After = web3.utils.toBN(await web3.eth.getBalance(alice));
         const balanceDiff = alice_BNBBalance_After.sub(alice_BNBBalance_Before);
 
-        assert.isTrue(balanceDiff.eq(aliceColl));
+        assert.isTrue(balanceDiff.add(gasUsed).eq(aliceColl));
       });
     }
 
@@ -5561,10 +5588,12 @@ contract("BorrowerOperations", async accounts => {
     });
 
     it("openTrove(): borrowing at non-zero base rate sends USDS fee to SABLE staking contract", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
-      await sableStaking.stake(dec(1, 18), { from: vaultAddress });
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE USDS balance before == 0
       const sableStaking_USDSBalance_Before = await usdsToken.balanceOf(sableStaking.address);
@@ -5617,9 +5646,11 @@ contract("BorrowerOperations", async accounts => {
     if (!withProxy) {
       // TODO: use rawLogs instead of logs
       it("openTrove(): borrowing at non-zero base records the (drawn debt + fee  + liq. reserve) on the Trove struct", async () => {
+        // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+        await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
         // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
         await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-        await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+        await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
         await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
         await openTrove({
@@ -5681,9 +5712,11 @@ contract("BorrowerOperations", async accounts => {
     }
 
     it("openTrove(): Borrowing at non-zero base rate increases the SABLE staking contract USDS fees-per-unit-staked", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
       await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE contract USDS fees-per-unit-staked is zero
@@ -5735,9 +5768,11 @@ contract("BorrowerOperations", async accounts => {
     });
 
     it("openTrove(): Borrowing at non-zero base rate sends requested amount to the user", async () => {
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
       // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
       await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-      await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
       await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
       // Check SABLE Staking contract balance before == 0
@@ -5820,8 +5855,12 @@ contract("BorrowerOperations", async accounts => {
       const F_USDS_Before = await sableStaking.F_USDS();
       assert.equal(F_USDS_Before, "0");
 
-      // A stakes SABLE
-      await sableToken.unprotectedMint(A, dec(100, 18));
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
+
+      // A artificially receives SABLE, then stakes it
+      await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
+      await mockSableLP.approve(sableStaking.address, dec(100, 18), { from: A })
       await sableStaking.stake(dec(100, 18), { from: A });
 
       // D opens trove
@@ -6987,7 +7026,7 @@ contract("BorrowerOperations", async accounts => {
     });
 
     if (!withProxy) {
-      it.skip("closeTrove(): fails if owner cannot receive BNB", async () => {
+      it("closeTrove(): fails if owner cannot receive BNB", async () => {
         const nonPayable = await NonPayable.new();
 
         // we need 2 troves to be able to close 1 and have 1 remaining in the system
@@ -7002,12 +7041,18 @@ contract("BorrowerOperations", async accounts => {
         // open trove from NonPayable proxy contract
         const _100pctHex = "0xde0b6b3a7640000";
         const _1e25Hex = "0xd3c21bcecceda1000000";
-        const openTroveData = th.getTransactionData("openTrove(uint256,uint256,address,address)", [
-          _100pctHex,
-          _1e25Hex,
-          "0x0",
-          "0x0"
-        ]);
+        const openTroveData = th
+          .getTransactionData("openTrove(uint256,uint256,address,address,bytes[])", [
+            _100pctHex,
+            _1e25Hex,
+            "0x0",
+            "0x0"
+          ])
+          // directly appending a pseudo price feed data into the calldata to get pass the price fetching process
+          .concat(
+            "00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000039b"
+          )
+          .concat(DEFAULT_PRICE_FEED_DATA[0].slice(2));
         await nonPayable.forward(borrowerOperations.address, openTroveData, {
           value: dec(10000, "ether")
         });
@@ -7020,8 +7065,14 @@ contract("BorrowerOperations", async accounts => {
           await th.checkRecoveryMode(contracts),
           "System should not be in Recovery Mode"
         );
-        // open trove from NonPayable proxy contract
-        const closeTroveData = th.getTransactionData("closeTrove()", []);
+        /* 
+        open trove from NonPayable proxy contract
+        directly appending a pseudo price feed data into the calldata to get pass the price fetching process
+        */ 
+        const closeTroveData = th
+          .getTransactionData("closeTrove(bytes[])", [])
+          .concat("000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000039b0100000000010088dd6bf30d18dbe9e06faf03620fe605fdfbc89a7693d9049c62a06d70cd7c2b18dec3ea73ba1038c55e2f253070327ac7dabbfc5052fd6584f466e8c648a3210064afdd4b00000000001aa27839d641b07743c0cb5f68c51f8cd31d2c0762bec00dc6fcd25433ef1ab5b6000000000818f5a40150325748000300010001020005009d1cdb1a5e1e3456d2977ee0d3d70765239f08a42855b9508fd479e15c6dc4d1feecf553770d9b10965f8fb64771e93f5690a182edc32be4a3236e0caaa6e0581a00000005bc8fe32d000000000079dfa2fffffff800000005bc4ffe2c000000000085b9e80100000002000000020000000064afdd4b0000000064afdd4a0000000064afdd4900000005bc859f4b00000000008423840000000064afdd496a20671c0e3f8cb219ce3f46e5ae096a4f2fdf936d2bd4da8925f70087d51dd830029479598797290e3638a1712c29bde2367d0eca794f778b25b5a472f192de00000006a20fd3b0000000000096c1c0fffffff800000006a417d4c800000000008a91520100000002000000020000000064afdd4b0000000064afdd4a0000000064afdd4900000006a20fd3b0000000000096c1c00000000064afdd4a28fe05d2708c6571182a7c9d1ff457a221b465edf5ea9af1373f9562d16b8d15f9c0172ba10dfa4d19088d94f5bf61d3b54d5bd7483a322a982e1373ee8ea31b000002c7d532d1e8000000002ee6c277fffffff8000002c77c1e2da0000000002c3393c60100000002000000020000000064afdd4b0000000064afdd4a0000000064afdd49000002c7d532d1e8000000002eee63970000000064afdd498b38db700e8b34640e681ec9a73e89608bda29415547a224f96585192b4b9dc794bce4aee88fdfa5b58d81090bd6b3784717fa6df85419d9f04433bb3d615d5c0000000004c96ee20000000000006cf1fffffff80000000004b9a48000000000000072370100000002000000020000000064afdd4b0000000064afdd4a0000000064afdd490000000004c9779100000000000080040000000064afdd493b69a3cf075646c5fd8148b705b8107e61a1a253d5d8a84355dcb628b3f1d12031775e1d6897129e8a84eeba975778fb50015b88039e9bc140bbd839694ac0ae000000000063bf8c00000000000005dcfffffff8000000000063a2e700000000000008dd0100000002000000020000000064afdd4b0000000064afdd4a0000000064afdd4a000000000063bec400000000000008330000000064afdd4a0000000000")
+
         await th.assertRevert(
           nonPayable.forward(borrowerOperations.address, closeTroveData),
           "ActivePool: sending BNB failed"

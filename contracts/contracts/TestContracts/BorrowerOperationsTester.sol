@@ -56,20 +56,17 @@ contract BorrowerOperationsTester is BorrowerOperations {
 
     function callInternalAdjustLoan(
         address _borrower, 
-        uint _collWithdrawal, 
-        uint _debtChange, 
-        bool _isDebtIncrease, 
         address _upperHint,
         address _lowerHint,
         bytes[] calldata priceFeedUpdateData
     ) external payable {
         AdjustTroveParam memory adjustTroveParam = AdjustTroveParam({
-            collWithdrawal: _collWithdrawal,
-            USDSChange: _debtChange,
-            isDebtIncrease: _isDebtIncrease,
+            collWithdrawal: 1e18,
+            USDSChange: 1e18,
+            isDebtIncrease: true,
             upperHint: _upperHint,
             lowerHint: _lowerHint,
-            maxFeePercentage: 0
+            maxFeePercentage: 5e15
         });
         _adjustTrove(_borrower, adjustTroveParam, priceFeedUpdateData);
     }

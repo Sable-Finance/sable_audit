@@ -3,6 +3,7 @@ const testHelpers = require("../utils/testHelpers.js")
 
 const TroveManagerTester = artifacts.require("TroveManagerTester")
 const SABLETokenTester = artifacts.require("SABLETokenTester")
+const { Interface } = require("@ethersproject/abi");
 
 const th = testHelpers.TestHelper
 
@@ -27,8 +28,10 @@ const {
   StabilityPoolProxy,
   SortedTrovesProxy,
   TokenProxy,
-  SABLEStakingProxy
+  SableStakingV2Proxy
 } = require('../utils/proxyHelpers.js')
+
+// TODO: fix staking (incl. commented lines)
 
 contract('BorrowerWrappers', async accounts => {
 
@@ -57,6 +60,8 @@ contract('BorrowerWrappers', async accounts => {
   let sableStaking
   let systemState
 
+  let mockSableLP
+
   let contracts
 
   let USDS_GAS_COMPENSATION
@@ -66,11 +71,13 @@ contract('BorrowerWrappers', async accounts => {
   const getNetBorrowingAmount = async (debtWithFee) => th.getNetBorrowingAmount(contracts, debtWithFee, DEFAULT_ORACLE_RATE)
   const openTrove = async (params) => th.openTrove(contracts, params)
 
+  // TODO: Confirm necessity of the test cases in this script
+
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore()
     contracts.troveManager = await TroveManagerTester.new()
     contracts = await deploymentHelper.deployUSDSToken(contracts)
-    const MINT_AMOUNT = toBN(dec(10000, 18))
+    const MINT_AMOUNT = toBN(dec(100000000, 18))
     const SABLEContracts = await deploymentHelper.deploySABLETesterContractsHardhat(bountyAddress, MINT_AMOUNT)
 
     
@@ -100,6 +107,11 @@ contract('BorrowerWrappers', async accounts => {
     // USDS_GAS_COMPENSATION = await borrowerOperations.USDS_GAS_COMPENSATION()
     USDS_GAS_COMPENSATION = await systemState.getUSDSGasCompensation()
 
+    mockSableLP = await deploymentHelper.deployMockSableLP(bountyAddress, MINT_AMOUNT);
+
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
+
     // funding PriceFeed contract
     await web3.eth.sendTransaction({from: funder, to: priceFeed.address, value: 1000000000})
   })
@@ -115,7 +127,7 @@ contract('BorrowerWrappers', async accounts => {
     const balanceBefore = toBN(await web3.eth.getBalance(alice))
 
     // recover BNB
-    const gas_Used = th.gasUsed(await borrowerWrappers.transferBNB(alice, amount, { from: alice, gasPrice: GAS_PRICE }))
+    const gas_Used = th.gasUsed(await borrowerWrappers.transferBNB(alice, amount.toString(), { from: alice, gasPrice: GAS_PRICE }))
     
     const balanceAfter = toBN(await web3.eth.getBalance(alice))
     const expectedBalance = toBN(balanceBefore.sub(toBN(gas_Used * GAS_PRICE)))
@@ -146,7 +158,7 @@ contract('BorrowerWrappers', async accounts => {
 
   // --- claimCollateralAndOpenTrove ---
 
-  it.skip('claimCollateralAndOpenTrove(): reverts if nothing to claim', async () => {
+  it('claimCollateralAndOpenTrove(): reverts if nothing to claim', async () => {
     // Whale opens Trove
     await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: whale } })
 
@@ -161,7 +173,7 @@ contract('BorrowerWrappers', async accounts => {
 
     // alice claims collateral and re-opens the trove
     await assertRevert(
-      borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, usdsAmount, alice, alice, { from: alice }),
+      borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, usdsAmount, alice, alice, DEFAULT_PRICE_FEED_DATA, { from: alice }),
       'CollSurplusPool: No collateral available to claim'
     )
 
@@ -173,7 +185,7 @@ contract('BorrowerWrappers', async accounts => {
     th.assertIsApproximatelyEqual(await troveManager.getTroveColl(proxyAddress), collateral)
   })
 
-  it.skip('claimCollateralAndOpenTrove(): without sending any value', async () => {
+  it('claimCollateralAndOpenTrove(): without sending any value', async () => {
     // alice opens Trove
     const { usdsAmount, netDebt: redeemAmount, collateral } = await openTrove({extraUSDSAmount: 0, ICR: toBN(dec(3, 18)), extraParams: { from: alice } })
     // Whale opens Trove
@@ -196,7 +208,7 @@ contract('BorrowerWrappers', async accounts => {
     assert.equal(await troveManager.getTroveStatus(proxyAddress), 4) // closed by redemption
 
     // alice claims collateral and re-opens the trove
-    await borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, usdsAmount, alice, alice, { from: alice })
+    await borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, usdsAmount, alice, alice, DEFAULT_PRICE_FEED_DATA, { from: alice })
 
     assert.equal(await web3.eth.getBalance(proxyAddress), '0')
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(proxyAddress), '0')
@@ -205,7 +217,7 @@ contract('BorrowerWrappers', async accounts => {
     th.assertIsApproximatelyEqual(await troveManager.getTroveColl(proxyAddress), expectedSurplus)
   })
 
-  it.skip('claimCollateralAndOpenTrove(): sending value in the transaction', async () => {
+  it('claimCollateralAndOpenTrove(): sending value in the transaction', async () => {
     // alice opens Trove
     const { usdsAmount, netDebt: redeemAmount, collateral } = await openTrove({ extraParams: { from: alice } })
     // Whale opens Trove
@@ -228,7 +240,7 @@ contract('BorrowerWrappers', async accounts => {
     assert.equal(await troveManager.getTroveStatus(proxyAddress), 4) // closed by redemption
 
     // alice claims collateral and re-opens the trove
-    await borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, usdsAmount, alice, alice, { from: alice, value: collateral })
+    await borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, usdsAmount, alice, alice, DEFAULT_PRICE_FEED_DATA, { from: alice, value: collateral })
 
     assert.equal(await web3.eth.getBalance(proxyAddress), '0')
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(proxyAddress), '0')
@@ -239,7 +251,7 @@ contract('BorrowerWrappers', async accounts => {
 
   // --- claimSPRewardsAndRecycle ---
 
-  it.skip('claimSPRewardsAndRecycle(): only owner can call it', async () => {
+  it('claimSPRewardsAndRecycle(): only owner can call it', async () => {
     // Whale opens Trove
     await openTrove({ extraUSDSAmount: toBN(dec(1850, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: whale } })
     // Whale deposits 1850 USDS in StabilityPool
@@ -257,7 +269,7 @@ contract('BorrowerWrappers', async accounts => {
     await priceFeed.setPrice(price);
 
     // Defaulter trove closed
-    const liquidationTX_1 = await troveManager.liquidate(defaulter_1, { from: owner })
+    const liquidationTX_1 = await troveManager.liquidate(defaulter_1, DEFAULT_PRICE_FEED_DATA, { from: owner })
     const [liquidatedDebt_1] = await th.getEmittedLiquidationValues(liquidationTX_1)
 
     // Bob tries to claims SP rewards in behalf of Alice
@@ -267,7 +279,7 @@ contract('BorrowerWrappers', async accounts => {
     await assertRevert(proxy.methods["execute(address,bytes)"](borrowerWrappers.scriptAddress, calldata, { from: bob }), 'ds-auth-unauthorized')
   })
 
-  it.skip('claimSPRewardsAndRecycle():', async () => {
+  it('claimSPRewardsAndRecycle():', async () => {
     // Whale opens Trove
     const whaleDeposit = toBN(dec(2350, 18))
     await openTrove({ extraUSDSAmount: whaleDeposit, ICR: toBN(dec(4, 18)), extraParams: { from: whale } })
@@ -287,7 +299,7 @@ contract('BorrowerWrappers', async accounts => {
     await priceFeed.setPrice(price);
 
     // Defaulter trove closed
-    const liquidationTX_1 = await troveManager.liquidate(defaulter_1, { from: owner })
+    const liquidationTX_1 = await troveManager.liquidate(defaulter_1, DEFAULT_PRICE_FEED_DATA, { from: owner })
     const [liquidatedDebt_1] = await th.getEmittedLiquidationValues(liquidationTX_1)
 
     // Alice USDSLoss is ((150/2500) * liquidatedDebt)
@@ -323,7 +335,8 @@ contract('BorrowerWrappers', async accounts => {
 
     // Alice claims SP rewards and puts them back in the system through the proxy
     const proxyAddress = borrowerWrappers.getProxyAddressFromUser(alice)
-    await borrowerWrappers.claimSPRewardsAndRecycle(th._100pct, alice, alice, { from: alice })
+    tx1 = await borrowerWrappers.claimSPRewardsAndRecycle(th._100pct, alice, alice, DEFAULT_PRICE_FEED_DATA, { from: alice })
+    console.log(tx1)
 
     const ethBalanceAfter = await web3.eth.getBalance(borrowerOperations.getProxyAddressFromUser(alice))
     const troveCollAfter = await troveManager.getTroveColl(alice)
@@ -360,20 +373,20 @@ contract('BorrowerWrappers', async accounts => {
 
   // --- claimStakingGainsAndRecycle ---
 
-  it.skip('claimStakingGainsAndRecycle(): only owner can call it', async () => {
+  it('claimStakingGainsAndRecycle(): only owner can call it', async () => {
     // Whale opens Trove
     await openTrove({ extraUSDSAmount: toBN(dec(1850, 18)), ICR: toBN(dec(2, 18)), extraParams: { from: whale } })
 
     // alice opens trove
     await openTrove({ extraUSDSAmount: toBN(dec(150, 18)), extraParams: { from: alice } })
 
-    // mint some SABLE
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(whale), dec(1850, 18))
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(alice), dec(150, 18))
-
-    // stake SABLE
-    await sableStaking.stake(dec(1850, 18), { from: whale })
-    await sableStaking.stake(dec(150, 18), { from: alice })
+    // A and whale artificially receives SABLE, then stakes them
+    await mockSableLP.transfer(whale, dec(1850, 18), { from: bountyAddress })
+    await mockSableLP.transfer(alice, dec(150, 18), { from: bountyAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1850, 18), { from: whale })
+    await mockSableLP.approve(sableStaking.address, dec(150, 18), { from: alice })
+    await sableStaking.stake(dec(1850, 18), { from: whale });
+    await sableStaking.stake(dec(150, 18), { from: alice });
 
     // Defaulter Trove opened
     const { usdsAmount, netDebt, totalDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } })
@@ -387,12 +400,12 @@ contract('BorrowerWrappers', async accounts => {
 
     // Bob tries to claims staking gains in behalf of Alice
     const proxy = borrowerWrappers.getProxyFromUser(alice)
-    const signature = 'claimStakingGainsAndRecycle(uint256,address,address)'
-    const calldata = th.getTransactionData(signature, [th._100pct, alice, alice])
+    const signature = 'claimStakingGainsAndRecycle(uint256,address,address,bytes[])'
+    const calldata = th.getTransactionData(signature, [th._100pct, alice, alice, DEFAULT_PRICE_FEED_DATA])
     await assertRevert(proxy.methods["execute(address,bytes)"](borrowerWrappers.scriptAddress, calldata, { from: bob }), 'ds-auth-unauthorized')
   })
 
-  it.skip('claimStakingGainsAndRecycle(): reverts if user has no trove', async () => {
+  it('claimStakingGainsAndRecycle(): reverts if user has no trove', async () => {
     const price = toBN(dec(200, 18))
 
     // Whale opens Trove
@@ -404,13 +417,13 @@ contract('BorrowerWrappers', async accounts => {
     //await openTrove({ extraUSDSAmount: toBN(dec(150, 18)), extraParams: { from: alice } })
     //await stabilityPool.provideToSP(dec(150, 18), ZERO_ADDRESS, { from: alice })
 
-    // mint some SABLE
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(whale), dec(1850, 18))
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(alice), dec(150, 18))
-
-    // stake SABLE
-    await sableStaking.stake(dec(1850, 18), { from: whale })
-    await sableStaking.stake(dec(150, 18), { from: alice })
+    // A and whale artificially receives SABLE, then stakes them
+    await mockSableLP.transfer(whale, dec(1850, 18), { from: bountyAddress })
+    await mockSableLP.transfer(alice, dec(150, 18), { from: bountyAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1850, 18), { from: whale })
+    await mockSableLP.approve(sableStaking.address, dec(150, 18), { from: alice })
+    await sableStaking.stake(dec(1850, 18), { from: whale });
+    await sableStaking.stake(dec(150, 18), { from: alice });
 
     // Defaulter Trove opened
     const { usdsAmount, netDebt, totalDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } })
@@ -437,7 +450,7 @@ contract('BorrowerWrappers', async accounts => {
 
     // Alice claims staking rewards and puts them back in the system through the proxy
     await assertRevert(
-      borrowerWrappers.claimStakingGainsAndRecycle(th._100pct, alice, alice, { from: alice }),
+      borrowerWrappers.claimStakingGainsAndRecycle(th._100pct, alice, alice, DEFAULT_PRICE_FEED_DATA, { from: alice }),
       'BorrowerWrappersScript: caller must have an active trove'
     )
 
@@ -467,7 +480,7 @@ contract('BorrowerWrappers', async accounts => {
     assert.equal(alice_pendingBNBGain, 0)
   })
 
-  it.skip('claimStakingGainsAndRecycle(): with only BNB gain', async () => {
+  it('claimStakingGainsAndRecycle(): with only BNB gain', async () => {
     const price = toBN(dec(200, 18))
 
     // Whale opens Trove
@@ -481,13 +494,13 @@ contract('BorrowerWrappers', async accounts => {
     await openTrove({ extraUSDSAmount: toBN(dec(150, 18)), extraParams: { from: alice } })
     await stabilityPool.provideToSP(dec(150, 18), ZERO_ADDRESS, { from: alice })
 
-    // mint some SABLE
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(whale), dec(1850, 18))
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(alice), dec(150, 18))
-
-    // stake SABLE
-    await sableStaking.stake(dec(1850, 18), { from: whale })
-    await sableStaking.stake(dec(150, 18), { from: alice })
+    // A and whale artificially receives SABLE, then stakes them
+    await mockSableLP.transfer(whale, dec(1850, 18), { from: bountyAddress })
+    await mockSableLP.transfer(alice, dec(150, 18), { from: bountyAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1850, 18), { from: whale })
+    await mockSableLP.approve(sableStaking.address, dec(150, 18), { from: alice })
+    await sableStaking.stake(dec(1850, 18), { from: whale });
+    await sableStaking.stake(dec(150, 18), { from: alice });
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
@@ -497,7 +510,7 @@ contract('BorrowerWrappers', async accounts => {
     await th.redeemCollateral(whale, contracts, redeemedAmount, GAS_PRICE)
 
     // Alice BNB gain is ((150/2000) * (redemption fee over redeemedAmount) / price)
-    const redemptionFee = await troveManager.getRedemptionFeeWithDecay(redeemedAmount)
+    const redemptionFee = await troveManager.getRedemptionFeeWithDecay(redeemedAmount, DEFAULT_ORACLE_RATE)
     const expectedBNBGain_A = redemptionFee.mul(toBN(dec(150, 18))).div(toBN(dec(2000, 18))).mul(mv._1e18BN).div(price)
 
     const ethBalanceBefore = await web3.eth.getBalance(borrowerOperations.getProxyAddressFromUser(alice))
@@ -517,7 +530,7 @@ contract('BorrowerWrappers', async accounts => {
 
     const proxyAddress = borrowerWrappers.getProxyAddressFromUser(alice)
     // Alice claims staking rewards and puts them back in the system through the proxy
-    await borrowerWrappers.claimStakingGainsAndRecycle(th._100pct, alice, alice, { from: alice })
+    await borrowerWrappers.claimStakingGainsAndRecycle(th._100pct, alice, alice, DEFAULT_PRICE_FEED_DATA, { from: alice })
 
     // Alice new USDS gain due to her own Trove adjustment: ((150/2000) * (borrowing fee over netDebtChange))
     const newBorrowingFee = await troveManagerOriginal.getBorrowingFeeWithDecay(netDebtChange, DEFAULT_ORACLE_RATE)
@@ -556,7 +569,7 @@ contract('BorrowerWrappers', async accounts => {
     assert.equal(alice_pendingBNBGain, 0)
   })
 
-  it.skip('claimStakingGainsAndRecycle(): with only USDS gain', async () => {
+  it('claimStakingGainsAndRecycle(): with only USDS gain', async () => {
     const price = toBN(dec(200, 18))
 
     // Whale opens Trove
@@ -566,13 +579,13 @@ contract('BorrowerWrappers', async accounts => {
     await openTrove({ extraUSDSAmount: toBN(dec(150, 18)), extraParams: { from: alice } })
     await stabilityPool.provideToSP(dec(150, 18), ZERO_ADDRESS, { from: alice })
 
-    // mint some SABLE
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(whale), dec(1850, 18))
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(alice), dec(150, 18))
-
-    // stake SABLE
-    await sableStaking.stake(dec(1850, 18), { from: whale })
-    await sableStaking.stake(dec(150, 18), { from: alice })
+    // A and whale artificially receives SABLE, then stakes them
+    await mockSableLP.transfer(whale, dec(1850, 18), { from: bountyAddress })
+    await mockSableLP.transfer(alice, dec(150, 18), { from: bountyAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1850, 18), { from: whale })
+    await mockSableLP.approve(sableStaking.address, dec(150, 18), { from: alice })
+    await sableStaking.stake(dec(1850, 18), { from: whale });
+    await sableStaking.stake(dec(150, 18), { from: alice });
 
     // Defaulter Trove opened
     const { usdsAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } })
@@ -593,7 +606,7 @@ contract('BorrowerWrappers', async accounts => {
     const borrowingRate = await troveManagerOriginal.getBorrowingRateWithDecay(DEFAULT_ORACLE_RATE)
 
     // Alice claims staking rewards and puts them back in the system through the proxy
-    await borrowerWrappers.claimStakingGainsAndRecycle(th._100pct, alice, alice, { from: alice })
+    await borrowerWrappers.claimStakingGainsAndRecycle(th._100pct, alice, alice, DEFAULT_PRICE_FEED_DATA, { from: alice })
 
     const ethBalanceAfter = await web3.eth.getBalance(borrowerOperations.getProxyAddressFromUser(alice))
     const troveCollAfter = await troveManager.getTroveColl(alice)
@@ -625,7 +638,7 @@ contract('BorrowerWrappers', async accounts => {
     assert.equal(alice_pendingBNBGain, 0)
   })
 
-  it.skip('claimStakingGainsAndRecycle(): with both BNB and USDS gains', async () => {
+  it('claimStakingGainsAndRecycle(): with both BNB and USDS gains', async () => {
     const price = toBN(dec(200, 18))
 
     // Whale opens Trove
@@ -635,13 +648,13 @@ contract('BorrowerWrappers', async accounts => {
     await openTrove({ extraUSDSAmount: toBN(dec(150, 18)), extraParams: { from: alice } })
     await stabilityPool.provideToSP(dec(150, 18), ZERO_ADDRESS, { from: alice })
 
-    // mint some SABLE
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(whale), dec(1850, 18))
-    await sableTokenOriginal.unprotectedMint(borrowerOperations.getProxyAddressFromUser(alice), dec(150, 18))
-
-    // stake SABLE
-    await sableStaking.stake(dec(1850, 18), { from: whale })
-    await sableStaking.stake(dec(150, 18), { from: alice })
+    // A and whale artificially receives SABLE, then stakes them
+    await mockSableLP.transfer(whale, dec(1850, 18), { from: bountyAddress })
+    await mockSableLP.transfer(alice, dec(150, 18), { from: bountyAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1850, 18), { from: whale })
+    await mockSableLP.approve(sableStaking.address, dec(150, 18), { from: alice })
+    await sableStaking.stake(dec(1850, 18), { from: whale });
+    await sableStaking.stake(dec(150, 18), { from: alice });
 
     // Defaulter Trove opened
     const { usdsAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } })
@@ -658,7 +671,7 @@ contract('BorrowerWrappers', async accounts => {
     await th.redeemCollateral(whale, contracts, redeemedAmount, GAS_PRICE)
 
     // Alice BNB gain is ((150/2000) * (redemption fee over redeemedAmount) / price)
-    const redemptionFee = await troveManager.getRedemptionFeeWithDecay(redeemedAmount)
+    const redemptionFee = await troveManager.getRedemptionFeeWithDecay(redeemedAmount, DEFAULT_ORACLE_RATE)
     const expectedBNBGain_A = redemptionFee.mul(toBN(dec(150, 18))).div(toBN(dec(2000, 18))).mul(mv._1e18BN).div(price)
 
     const ethBalanceBefore = await web3.eth.getBalance(borrowerOperations.getProxyAddressFromUser(alice))
@@ -678,7 +691,7 @@ contract('BorrowerWrappers', async accounts => {
     const expectedSABLEGain_A = toBN('839557069990108416000000')
 
     // Alice claims staking rewards and puts them back in the system through the proxy
-    await borrowerWrappers.claimStakingGainsAndRecycle(th._100pct, alice, alice, { from: alice })
+    await borrowerWrappers.claimStakingGainsAndRecycle(th._100pct, alice, alice, DEFAULT_PRICE_FEED_DATA, { from: alice })
 
     // Alice new USDS gain due to her own Trove adjustment: ((150/2000) * (borrowing fee over netDebtChange))
     const newBorrowingFee = await troveManagerOriginal.getBorrowingFeeWithDecay(netDebtChange, DEFAULT_ORACLE_RATE)

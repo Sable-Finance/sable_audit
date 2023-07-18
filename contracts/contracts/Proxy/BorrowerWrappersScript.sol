@@ -112,12 +112,12 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, BNBTransferScript, 
             _requireUserHasTrove(address(this));
             uint USDSAmount = _getNetUSDSAmount(claimedCollateral, priceFeedUpdateData);
             IBorrowerOperations.AdjustTroveParam memory adjustParam = IBorrowerOperations.AdjustTroveParam({
-                maxFeePercentage: _maxFee,
-                upperHint: _upperHint,
-                lowerHint: _lowerHint,
+                collWithdrawal: 0,
                 USDSChange: USDSAmount,
                 isDebtIncrease: true,
-                collWithdrawal: 0
+                upperHint: _upperHint,
+                lowerHint: _lowerHint,
+                maxFeePercentage: _maxFee
             });
             borrowerOperations.adjustTrove{ value: claimedCollateral }(
                 adjustParam,

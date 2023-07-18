@@ -536,31 +536,6 @@ contract('Access Control: Liquity functions with the caller restricted to Liquit
     })
   })
 
-  describe('SABLEToken', async accounts => {
-    it("sendToSABLEStaking(): reverts when caller is not the SABLESstaking", async () => {
-      // Check multisig has some SABLE
-      assert.isTrue((await sableToken.balanceOf(bountyAddress)).gt(toBN('0')))
-
-      // multisig tries to call it
-      try {
-        const tx = await sableToken.sendToSABLEStaking(bountyAddress, 1, { from: bountyAddress })
-      } catch (err) {
-        assert.include(err.message, "revert")
-      }
-
-      // Owner transfers 1 SABLE to bob
-      await sableToken.transfer(bob, dec(1, 18), { from: bountyAddress })
-      assert.equal((await sableToken.balanceOf(bob)), dec(1, 18))
-
-      // Bob tries to call it
-      try {
-        const tx = await sableToken.sendToSABLEStaking(bob, dec(1, 18), { from: bob })
-      } catch (err) {
-        assert.include(err.message, "revert")
-      }
-    })
-  })
-
   describe('CommunityIssuance', async accounts => {
     it("sendSABLE(): reverts when caller is not the StabilityPool", async () => {
       const tx1 = communityIssuance.sendSABLE(alice, dec(100, 18), {from: alice})

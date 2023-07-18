@@ -19,6 +19,7 @@ const TroveHelper = artifacts.require("./TroveHelper.sol");
 const SableStakingV2 = artifacts.require("./SableStakingV2.sol");
 const SableRewarder = artifacts.require("./SableRewarder.sol");
 const SABLEToken = artifacts.require("./SABLEToken.sol");
+const MockSableLP = artifacts.require("./MockSableLP.sol");
 const CommunityIssuance = artifacts.require("./CommunityIssuance.sol");
 
 const SABLETokenTester = artifacts.require("./SABLETokenTester.sol");
@@ -41,7 +42,6 @@ const SableStakingV2Script = artifacts.require("SableStakingV2Script");
 const testHelpers = require("./testHelpers.js");
 
 const hardHatAddressDeployDefault = "0x31c57298578f7508B5982062cfEc5ec8BD346247";
-
 
 const {
   buildUserProxies,
@@ -69,7 +69,7 @@ const maxBytes32 = "0x" + "f".repeat(64);
 
 const th = testHelpers.TestHelper;
 const toBN = th.toBN;
-const dec = th.dec
+const dec = th.dec;
 
 class DeploymentHelper {
   static async deployLiquityCore() {
@@ -249,6 +249,12 @@ class DeploymentHelper {
       sableToken
     };
     return SABLEContracts;
+  }
+
+  static async deployMockSableLP(vaultAddress, mintAmount) {
+    const mockSableLP = await MockSableLP.new(vaultAddress, mintAmount);
+    MockSableLP.setAsDeployed(mockSableLP);
+    return mockSableLP;
   }
 
   static async deployLiquityCoreTruffle() {
@@ -471,8 +477,8 @@ class DeploymentHelper {
 
     await contracts.priceFeedTestnet.setMockPyth(contracts.mockPyth.address);
     await contracts.priceFeedTestnet.setAddressesTestnet(
-      contracts.troveManager.address, 
-      contracts.borrowerOperations.address, 
+      contracts.troveManager.address,
+      contracts.borrowerOperations.address,
       contracts.stabilityPool.address
     );
 
@@ -541,10 +547,9 @@ class DeploymentHelper {
 
     await SABLEContracts.sableRewarder.setParams(
       SABLEContracts.sableToken.address,
-      coreContracts.stabilityPool.address,
+      SABLEContracts.sableStaking.address,
       toBN(0e18).toString()
     );
   }
-
 }
 module.exports = DeploymentHelper;

@@ -50,6 +50,7 @@ contract('TroveManager', async accounts => {
   let systemState
   let sableToken
   let communityIssuance
+  let mockSableLP
 
   let contracts
 
@@ -70,6 +71,8 @@ contract('TroveManager', async accounts => {
     )
     const MINT_AMOUNT = toBN(dec(100000000, 18))
     const SABLEContracts = await deploymentHelper.deploySABLEContracts(vaultAddress, MINT_AMOUNT)
+    
+    mockSableLP = await deploymentHelper.deployMockSableLP(vaultAddress, MINT_AMOUNT);
 
     priceFeed = contracts.priceFeedTestnet
     usdsToken = contracts.usdsToken
@@ -85,6 +88,7 @@ contract('TroveManager', async accounts => {
 
     sableStaking = SABLEContracts.sableStaking
     sableToken = SABLEContracts.sableToken
+    sableRewarder = SABLEContracts.sableRewarder
     communityIssuance = SABLEContracts.communityIssuance
 
     await sableToken.transfer(communityIssuance.address, '32000000000000000000000000', {
@@ -501,7 +505,7 @@ contract('TroveManager', async accounts => {
     assert.isFalse(await th.checkRecoveryMode(contracts));
 
     // Attempt to liquidate bob
-    await assertRevert(troveManager.liquidate(bob, DEFAULT_PRICE_FEED_DATA), "TM")
+    await assertRevert(troveManager.liquidate(bob, DEFAULT_PRICE_FEED_DATA), "3")
 
     // Check bob active, check whale active
     assert.isTrue((await sortedTroves.contains(bob)))
@@ -781,7 +785,7 @@ contract('TroveManager', async accounts => {
     assert.isFalse(await th.checkRecoveryMode(contracts));
 
     // Attempt to liquidate Bob
-    await assertRevert(troveManager.liquidate(bob, DEFAULT_PRICE_FEED_DATA), "TM")
+    await assertRevert(troveManager.liquidate(bob, DEFAULT_PRICE_FEED_DATA), "3")
 
     // Confirm Bob's trove is still active
     assert.isTrue(await sortedTroves.contains(bob))
@@ -960,7 +964,7 @@ contract('TroveManager', async accounts => {
     assert.isFalse(await th.checkRecoveryMode(contracts))
 
     // Liquidate Alice, Bob, Carol
-    await assertRevert(troveManager.liquidate(alice, DEFAULT_PRICE_FEED_DATA), "TM")
+    await assertRevert(troveManager.liquidate(alice, DEFAULT_PRICE_FEED_DATA), "3")
     await troveManager.liquidate(bob, DEFAULT_PRICE_FEED_DATA)
     await troveManager.liquidate(carol, DEFAULT_PRICE_FEED_DATA)
 
@@ -2796,7 +2800,7 @@ contract('TroveManager', async accounts => {
 
     // USDS redemption is 55000 US
     const USDSRedemption = dec(55000, 18)
-    const tx1 = await th.redeemCollateralAndGetTxObject(B, contracts, USDSRedemption, th._100pct)
+    const tx1 = await th.redeemCollateralAndGetTxObject(B, contracts, USDSRedemption, GAS_PRICE, th._100pct)
     
     // Check B, C closed and A remains active
     assert.isTrue(await sortedTroves.contains(A))
@@ -2825,7 +2829,7 @@ contract('TroveManager', async accounts => {
     // USDS redemption is 54500 USDS
     const USDSRedemption = dec(54500, 18)
 
-    const tx1 = await th.redeemCollateralAndGetTxObject(B, contracts, USDSRedemption, th._100pct)
+    const tx1 = await th.redeemCollateralAndGetTxObject(B, contracts, USDSRedemption, GAS_PRICE, th._100pct)
     
     // Check B, C closed and A remains active
     assert.isTrue(await sortedTroves.contains(A))
@@ -3145,15 +3149,24 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, GAS_PRICE, dec(10, 18), 0), "Max fee percentage must be between 0.5% and 100%")
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, GAS_PRICE, dec(10, 18), 1), "Max fee percentage must be between 0.5% and 100%")
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, GAS_PRICE, dec(10, 18), '4999999999999999'), "Max fee percentage must be between 0.5% and 100%")
+    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, dec(10, 18), GAS_PRICE, 0), "Max fee percentage must be between 0.5% and 100%")
+    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, dec(10, 18), GAS_PRICE, 1), "Max fee percentage must be between 0.5% and 100%")
+    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, dec(10, 18), GAS_PRICE, '4999999999999999'), "Max fee percentage must be between 0.5% and 100%")
   })
 
   it("redeemCollateral(): reverts if fee exceeds max fee percentage", async () => {
-    const { totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraUSDSAmount: dec(80, 18), extraParams: { from: A } })
-    const { totalDebt: B_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraUSDSAmount: dec(90, 18), extraParams: { from: B } })
-    const { totalDebt: C_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraUSDSAmount: dec(100, 18), extraParams: { from: C } })
+    const { totalDebt: A_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraUSDSAmount: dec(900, 18), extraParams: { from: A } })
+    const { totalDebt: B_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraUSDSAmount: dec(900, 18), extraParams: { from: B } })
+    const { totalDebt: C_totalDebt } = await openTrove({ ICR: toBN(dec(400, 16)), extraUSDSAmount: dec(900, 18), extraParams: { from: C } })
+
+    /*
+    Expected total supply should be 8720.25
+    testHelpers will calculate the pre-fee/gas compensation debt amount that would end up to be a sum of min Trove size + extraUSDSAmount
+    In the above case, 2686.6 * 1.005 (fee except oracle rate) + 200 = 2000 + 900
+    
+    Including oracle rate, the total supply would equal 3 * (2686.6 * 1.0075 + 200) = 8720.25
+    */
+
     const expectedTotalSupply = A_totalDebt.add(B_totalDebt).add(C_totalDebt)
 
     // Check total USDS supply
@@ -3165,27 +3178,36 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider)
 
-    // USDS redemption is 27 USD: a redemption that incurs a fee of 27/(270 * 2) = 5%
+    /*
+    Redemption rate (w/ fee floor & oracle rate)
+    = latest base rate -> 0% since first time + (Redemption amount / USDS supply) -> 10% / BETA -> 2 = 5%
+
+    Full redemption rate
+    = 5% + 0.5% + 0.25% = 5.75%
+    */
     const attemptedUSDSRedemption = expectedTotalSupply.div(toBN(10))
 
-    // Max fee is <5%
-    const lessThan5pct = '49999999999999999'
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, lessThan5pct), "Fee exceeded provided maximum")
+    // Max fee is 5.74%
+    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, GAS_PRICE, dec(574, 14)), "Fee exceeded provided maximum")
   
     await troveManager.setBaseRate(0)  // artificially zero the baseRate
+
+    // Max fee is 5.75%
+    const tx1 = await th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, GAS_PRICE, dec(575, 14))
+    assert.isTrue(tx1.receipt.status)
     
     // Max fee is 1%
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, dec(1, 16)), "Fee exceeded provided maximum")
+    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, GAS_PRICE, dec(1, 16)), "Fee exceeded provided maximum")
   
     await troveManager.setBaseRate(0)
 
      // Max fee is 3.754%
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, dec(3754, 13)), "Fee exceeded provided maximum")
+    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, GAS_PRICE, dec(3754, 13)), "Fee exceeded provided maximum")
   
     await troveManager.setBaseRate(0)
 
     // Max fee is 0.5%
-    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, dec(5, 15)), "Fee exceeded provided maximum")
+    await assertRevert(th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, GAS_PRICE, dec(5, 15)), "Fee exceeded provided maximum")
   })
 
   it("redeemCollateral(): succeeds if fee is less than max fee percentage", async () => {
@@ -3210,32 +3232,32 @@ contract('TroveManager', async accounts => {
     const price = await priceFeed.getPrice()
     const BNBDrawn = attemptedUSDSRedemption.mul(mv._1e18BN).div(price)
     const slightlyMoreThanFee = (await troveManager.getRedemptionFeeWithDecay(BNBDrawn, DEFAULT_ORACLE_RATE))
-    const tx1 = await th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, slightlyMoreThanFee)
+    const tx1 = await th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, GAS_PRICE, slightlyMoreThanFee)
     assert.isTrue(tx1.receipt.status)
 
     await troveManager.setBaseRate(0)  // Artificially zero the baseRate
     
     // Attempt with maxFee = 5.5%
     const exactSameFee = (await troveManager.getRedemptionFeeWithDecay(BNBDrawn, DEFAULT_ORACLE_RATE))
-    const tx2 = await th.redeemCollateralAndGetTxObject(C, contracts, attemptedUSDSRedemption, exactSameFee)
+    const tx2 = await th.redeemCollateralAndGetTxObject(C, contracts, attemptedUSDSRedemption, GAS_PRICE, exactSameFee)
     assert.isTrue(tx2.receipt.status)
 
     await troveManager.setBaseRate(0)
 
      // Max fee is 10%
-    const tx3 = await th.redeemCollateralAndGetTxObject(B, contracts, attemptedUSDSRedemption, dec(1, 17))
+    const tx3 = await th.redeemCollateralAndGetTxObject(B, contracts, attemptedUSDSRedemption, GAS_PRICE, dec(1, 17))
     assert.isTrue(tx3.receipt.status)
 
     await troveManager.setBaseRate(0)
 
     // Max fee is 37.659%
-    const tx4 = await th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, dec(37659, 13))
+    const tx4 = await th.redeemCollateralAndGetTxObject(A, contracts, attemptedUSDSRedemption, GAS_PRICE, dec(37659, 13))
     assert.isTrue(tx4.receipt.status)
 
     await troveManager.setBaseRate(0)
 
     // Max fee is 100%
-    const tx5 = await th.redeemCollateralAndGetTxObject(C, contracts, attemptedUSDSRedemption, dec(1, 18))
+    const tx5 = await th.redeemCollateralAndGetTxObject(C, contracts, attemptedUSDSRedemption, GAS_PRICE, dec(1, 18))
     assert.isTrue(tx5.receipt.status)
   })
 
@@ -3772,10 +3794,12 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a redemption made when base rate is non-zero increases the base rate, for negligible time passed", async () => {
-    // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
-    await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-    await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
-    await sableStaking.stake(dec(1, 18), { from: vaultAddress })
+      // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+      await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
+      // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
+      await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
+      await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+      await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
     await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
 
@@ -3870,9 +3894,11 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a redemption made at zero base rate send a non-zero BNBFee to SABLE staking contract", async () => {
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
     // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-    await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
     await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
     await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
@@ -3906,9 +3932,11 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a redemption made at zero base increases the BNB-fees-per-SABLE-staked in SABLE Staking contract", async () => {
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
     // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-    await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
     await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
     await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
@@ -3942,9 +3970,11 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a redemption made at a non-zero base rate send a non-zero BNBFee to SABLE staking contract", async () => {
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
     // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-    await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
     await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
     await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
@@ -3984,9 +4014,11 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a redemption made at a non-zero base rate increases BNB-per-SABLE-staked in the staking contract", async () => {
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
     // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-    await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
     await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
     await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
@@ -4027,9 +4059,11 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a redemption sends the BNB remainder (BNBDrawn - BNBFee) to the redeemer", async () => {
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
     // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-    await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
     await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
     const { totalDebt: W_totalDebt } = await openTrove({ ICR: toBN(dec(20, 18)), extraParams: { from: whale } })
@@ -4079,9 +4113,11 @@ contract('TroveManager', async accounts => {
   })
 
   it("redeemCollateral(): a full redemption (leaving trove with 0 debt), closes the trove", async () => {
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
     // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-    await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
     await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
     const { netDebt: W_netDebt } = await openTrove({ ICR: toBN(dec(20, 18)), extraUSDSAmount: dec(10000, 18), extraParams: { from: whale } })
@@ -4109,9 +4145,11 @@ contract('TroveManager', async accounts => {
   })
 
   const redeemCollateral3Full1Partial = async () => {
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
     // time fast-forwards 14 days, and vaultAddress stakes 1 SABLE
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
-    await sableToken.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
+    await mockSableLP.approve(sableStaking.address, dec(1, 18), { from: vaultAddress })
     await sableStaking.stake(dec(1, 18), { from: vaultAddress })
 
     const { netDebt: W_netDebt } = await openTrove({ ICR: toBN(dec(20, 18)), extraUSDSAmount: dec(10000, 18), extraParams: { from: whale } })
@@ -4381,7 +4419,7 @@ contract('TroveManager', async accounts => {
           gasPrice: GAS_PRICE
         }
       ),
-      'TM'
+      '5'
     )
   })
 

@@ -45,6 +45,7 @@ contract('SABLEStaking revenue share tests', async accounts => {
   let sableStaking
   let sableToken
   let troveHelper
+  let mockSableLP
 
   let contracts
 
@@ -57,6 +58,7 @@ contract('SABLEStaking revenue share tests', async accounts => {
     contracts.troveManager = await TroveManagerTester.new()
     contracts = await deploymentHelper.deployUSDSTokenTester(contracts)
     const SABLEContracts = await deploymentHelper.deploySABLETesterContractsHardhat(vaultAddress, MINT_AMOUNT)
+    mockSableLP = await deploymentHelper.deployMockSableLP(vaultAddress, MINT_AMOUNT);
     
     await deploymentHelper.connectCoreContracts(contracts, SABLEContracts)
     await deploymentHelper.connectSABLEContractsToCore(SABLEContracts, contracts)
@@ -79,19 +81,19 @@ contract('SABLEStaking revenue share tests', async accounts => {
     // funding PriceFeed contract
     await web3.eth.sendTransaction({from: funder, to: priceFeed.address, value: 1000000000})
 
-    // set LP token address to be sable token address for ease
-    await sableStaking.setSableLPAddress(sableToken.address)
+    // setting SableStakingV2 LP token address to Sable token address to initialize staking and allow Sable token deposit
+    await sableStaking.setSableLPAddress(mockSableLP.address, { from: owner });
   })
 
   it('stake(): reverts if amount is zero', async () => {
     // vaultAddress transfers SABLE to staker A
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
 
     // console.log(`A sable bal: ${await sableToken.balanceOf(A)}`)
 
     // A makes stake
-    await sableToken.approve(sableStaking.address, dec(100, 18), {from: A})
-    await assertRevert(sableStaking.stake(0, {from: A}), "SABLEStaking: Amount must be non-zero")
+    await mockSableLP.approve(sableStaking.address, dec(100, 18), { from: A })
+    await assertRevert(sableStaking.stake(0, {from: A}), "SableStaking: Amount must be non-zero")
   })
 
   it("BNB fee per SABLE staked increases when a redemption fee is triggered and totalStakes > 0", async () => {
@@ -104,12 +106,10 @@ contract('SABLEStaking revenue share tests', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
 
     // vaultAddress transfers SABLE to staker A
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress, gasPrice: GAS_PRICE})
-
-    // console.log(`A sable bal: ${await sableToken.balanceOf(A)}`)
+    await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
 
     // A makes stake
-    await sableToken.approve(sableStaking.address, dec(100, 18), {from: A})
+    await mockSableLP.approve(sableStaking.address, dec(100, 18), {from: A})
     await sableStaking.stake(dec(100, 18), {from: A})
 
     // Check BNB fee per unit staked is zero
@@ -153,12 +153,12 @@ contract('SABLEStaking revenue share tests', async accounts => {
     const F_BNB_Before = await sableStaking.F_BNB()
     assert.equal(F_BNB_Before, '0')
 
-    const B_BalBeforeREdemption = await usdsToken.balanceOf(B)
+    const B_BalBeforeRedemption = await usdsToken.balanceOf(B)
     // B redeems
     const redemptionTx = await th.redeemCollateralAndGetTxObject(B, contracts, dec(100, 18), GAS_PRICE)
     
     const B_BalAfterRedemption = await usdsToken.balanceOf(B)
-    assert.isTrue(B_BalAfterRedemption.lt(B_BalBeforeREdemption))
+    assert.isTrue(B_BalAfterRedemption.lt(B_BalBeforeRedemption))
 
     // check BNB fee emitted in event is non-zero
     const emittedBNBFee = toBN((await th.getEmittedRedemptionValues(redemptionTx))[3])
@@ -180,14 +180,14 @@ contract('SABLEStaking revenue share tests', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
 
     // vaultAddress transfers SABLE to staker A
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
 
     // A makes stake
-    await sableToken.approve(sableStaking.address, dec(100, 18), {from: A})
+    await mockSableLP.approve(sableStaking.address, dec(100, 18), {from: A})
     await sableStaking.stake(dec(100, 18), {from: A})
 
     // Check USDS fee per unit staked is zero
-    const F_USDS_Before = await sableStaking.F_BNB()
+    const F_USDS_Before = await sableStaking.F_USDS()
     assert.equal(F_USDS_Before, '0')
 
     const B_BalBeforeREdemption = await usdsToken.balanceOf(B)
@@ -268,10 +268,10 @@ contract('SABLEStaking revenue share tests', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
 
     // vaultAddress transfers SABLE to staker A
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
 
     // A makes stake
-    await sableToken.approve(sableStaking.address, dec(100, 18), {from: A})
+    await mockSableLP.approve(sableStaking.address, dec(100, 18), {from: A})
     await sableStaking.stake(dec(100, 18), {from: A})
 
     const B_BalBeforeREdemption = await usdsToken.balanceOf(B)
@@ -341,10 +341,10 @@ contract('SABLEStaking revenue share tests', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
 
     // vaultAddress transfers SABLE to staker A
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(A, dec(50, 18), { from: vaultAddress })
 
     // A makes stake
-    await sableToken.approve(sableStaking.address, dec(100, 18), {from: A})
+    await mockSableLP.approve(sableStaking.address, dec(50, 18), {from: A})
     await sableStaking.stake(dec(50, 18), {from: A})
 
     const B_BalBeforeREdemption = await usdsToken.balanceOf(B)
@@ -386,6 +386,10 @@ contract('SABLEStaking revenue share tests', async accounts => {
     const expectedTotalBNBGain = emittedBNBFee_1.add(emittedBNBFee_2)
     const expectedTotalUSDSGain = emittedUSDSFee_1.add(emittedUSDSFee_2)
 
+    // vaultAddress transfers SABLE to staker A
+    await mockSableLP.transfer(A, dec(50, 18), { from: vaultAddress })
+    await mockSableLP.approve(sableStaking.address, dec(50, 18), {from: A})
+
     const A_BNBBalance_Before = toBN(await web3.eth.getBalance(A))
     const A_USDSBalance_Before = toBN(await usdsToken.balanceOf(A))
 
@@ -413,11 +417,11 @@ contract('SABLEStaking revenue share tests', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
 
     // vaultAddress transfers SABLE to staker A
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
 
     // A makes stake
-    await sableToken.approve(sableStaking.address, dec(100, 18), {from: A})
-    await sableStaking.stake(dec(50, 18), {from: A})
+    await mockSableLP.approve(sableStaking.address, dec(100, 18), {from: A})
+    await sableStaking.stake(dec(100, 18), {from: A})
 
     const B_BalBeforeREdemption = await usdsToken.balanceOf(B)
     // B redeems
@@ -459,11 +463,11 @@ contract('SABLEStaking revenue share tests', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
 
     // vaultAddress transfers SABLE to staker A
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(A, dec(100, 18), { from: vaultAddress })
 
     // A makes stake
-    await sableToken.approve(sableStaking.address, dec(100, 18), {from: A})
-    await sableStaking.stake(dec(50, 18), {from: A})
+    await mockSableLP.approve(sableStaking.address, dec(100, 18), {from: A})
+    await sableStaking.stake(dec(100, 18), {from: A})
 
     const B_BalBeforeREdemption = await usdsToken.balanceOf(B)
     // B redeems
@@ -522,22 +526,22 @@ contract('SABLEStaking revenue share tests', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_DAY * 14, web3.currentProvider)
 
     // vaultAddress transfers SABLE to staker A, B, C
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress})
-    await sableToken.transfer(B, dec(200, 18), {from: vaultAddress})
-    await sableToken.transfer(C, dec(300, 18), {from: vaultAddress})
+    await mockSableLP.transfer(A, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(B, dec(200, 18), {from: vaultAddress})
+    await mockSableLP.transfer(C, dec(300, 18), {from: vaultAddress})
 
     // A, B, C make stake
-    await sableToken.approve(sableStaking.address, dec(100, 18), {from: A})
-    await sableToken.approve(sableStaking.address, dec(200, 18), {from: B})
-    await sableToken.approve(sableStaking.address, dec(300, 18), {from: C})
+    await mockSableLP.approve(sableStaking.address, dec(100, 18), {from: A})
+    await mockSableLP.approve(sableStaking.address, dec(200, 18), {from: B})
+    await mockSableLP.approve(sableStaking.address, dec(300, 18), {from: C})
     await sableStaking.stake(dec(100, 18), {from: A})
     await sableStaking.stake(dec(200, 18), {from: B})
     await sableStaking.stake(dec(300, 18), {from: C})
 
     // Confirm staking contract holds 600 SABLE
     // console.log(`sable staking SABLE bal: ${await sableToken.balanceOf(sableStaking.address)}`)
-    assert.equal(await sableToken.balanceOf(sableStaking.address), dec(600, 18))
-    assert.equal(await sableStaking.totalSABLEStaked(), dec(600, 18))
+    assert.equal(await mockSableLP.balanceOf(sableStaking.address), dec(600, 18))
+    assert.equal(await sableStaking.totalSableLPStaked(), dec(600, 18))
 
     // F redeems
     const redemptionTx_1 = await th.redeemCollateralAndGetTxObject(F, contracts, dec(45, 18), gasPrice = GAS_PRICE)
@@ -560,13 +564,13 @@ contract('SABLEStaking revenue share tests', async accounts => {
     assert.isTrue(emittedUSDSFee_2.gt(toBN('0')))
 
     // D obtains SABLE from owner and makes a stake
-    await sableToken.transfer(D, dec(50, 18), {from: vaultAddress})
-    await sableToken.approve(sableStaking.address, dec(50, 18), {from: D})
+    await mockSableLP.transfer(D, dec(50, 18), {from: vaultAddress})
+    await mockSableLP.approve(sableStaking.address, dec(50, 18), {from: D})
     await sableStaking.stake(dec(50, 18), {from: D})
 
     // Confirm staking contract holds 650 SABLE
-    assert.equal(await sableToken.balanceOf(sableStaking.address), dec(650, 18))
-    assert.equal(await sableStaking.totalSABLEStaked(), dec(650, 18))
+    assert.equal(await mockSableLP.balanceOf(sableStaking.address), dec(650, 18))
+    assert.equal(await sableStaking.totalSableLPStaked(), dec(650, 18))
 
      // G redeems
      const redemptionTx_3 = await th.redeemCollateralAndGetTxObject(C, contracts, dec(197, 18), gasPrice = GAS_PRICE)
@@ -642,7 +646,7 @@ contract('SABLEStaking revenue share tests', async accounts => {
 
     //Confirm pool Size is now 0
     assert.equal((await sableToken.balanceOf(sableStaking.address)), '0')
-    assert.equal((await sableStaking.totalSABLEStaked()), '0')
+    assert.equal((await sableStaking.totalSableLPStaked()), '0')
 
     // Get A-D BNB and USDS balances
     const A_BNBBalance_After = toBN(await web3.eth.getBalance(A))
@@ -685,14 +689,17 @@ contract('SABLEStaking revenue share tests', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_YEAR, web3.currentProvider)
 
     // vaultAddress transfers SABLE to staker A and the non-payable proxy
-    await sableToken.transfer(A, dec(100, 18), {from: vaultAddress})
-    await sableToken.transfer(nonPayable.address, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(A, dec(100, 18), {from: vaultAddress})
+    await mockSableLP.transfer(nonPayable.address, dec(100, 18), {from: vaultAddress})
 
     //  A makes stake
+    await mockSableLP.approve(sableStaking.address, dec(100, 18), { from: A })
     const A_stakeTx = await sableStaking.stake(dec(100, 18), {from: A})
     assert.isTrue(A_stakeTx.receipt.status)
 
     //  A tells proxy to make a stake
+    const proxyapproveTxData = await th.getTransactionData('approve(address,uint256)', [sableStaking.address,'0x56bc75e2d63100000'])
+    await nonPayable.forward(mockSableLP.address, proxyapproveTxData, {from: A})
     const proxystakeTxData = await th.getTransactionData('stake(uint256)', ['0x56bc75e2d63100000'])  // proxy stakes 100 SABLE
     await nonPayable.forward(sableStaking.address, proxystakeTxData, {from: A})
 
@@ -730,6 +737,6 @@ contract('SABLEStaking revenue share tests', async accounts => {
 
   it('Test requireCallerIsTroveManager', async () => {
     const sableStakingTester = await SABLEStakingTester.new()
-    await assertRevert(sableStakingTester.requireCallerIsTroveManager(), 'SABLEStaking: caller is not TroveM')
+    await assertRevert(sableStakingTester.requireCallerIsTroveManager(), 'SableStaking: caller is not TroveM')
   })
 })

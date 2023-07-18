@@ -89,6 +89,8 @@ contract('StabilityPool', async accounts => {
       await deploymentHelper.connectCoreContracts(contracts, SABLEContracts)
       await deploymentHelper.connectSABLEContractsToCore(SABLEContracts, contracts)
 
+      await communityIssuance.updateRewardPerSec(dec(1, 18), { from: owner })
+
       // Register 3 front ends
       await th.registerFrontEnds(frontEnds, stabilityPool)
     })
@@ -3099,8 +3101,16 @@ contract('StabilityPool', async accounts => {
       const aliceTrove_BNB_Before = aliceTrove_Before[1]
       assert.isTrue(aliceTrove_BNB_Before.gt(toBN('0')))
 
+      /*
+      Liquity's orignally set price at $10, which would cause this test to fail as transaction in assertion will revert with "StabilityPool: caller must have non-zero BNB Gain".
+      This is because at $10 price will cause Trove become undercollateralized (ICR < 100%), 
+      which the debt and collateral will be redistributed to other troves instead of liquidated with USDS in SP. 
+      There will therefore be no BNB Gains in SP and amount of USDS deposited in SP will not change.
+      Therefore, price is set at $105 instead to make defaulter's ICR falls below MCR (at 105%), which is eligible for liquidation, but will not trigger redistribution. 
+      If price is set too high, such as $109.9, the test will fail as when Alice withdrawBNBGainToTrove, additional collateral will make her ICR become larger than MCR.
+      */
       // price drops: defaulter's Trove falls below MCR
-      await priceFeed.setPrice(dec(10, 18));
+      await priceFeed.setPrice(dec(105, 18));
 
       // defaulter's Trove is closed.
       await troveManager.liquidate(defaulter_1, DEFAULT_PRICE_FEED_DATA, { from: owner })

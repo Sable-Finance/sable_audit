@@ -358,8 +358,9 @@ contract('SABLE Token', async accounts => {
       deadline, v, r, s), 'SABLE: invalid signature')
 
     // Check that the zero address fails
+    // ecrecover is expected to return 0x0 address from invalid signature
     await assertRevert(sableTokenTester.permit('0x0000000000000000000000000000000000000000',
-      approve.spender, approve.value, deadline, '0x99', r, s), 'SABLE: invalid signature')
+      approve.spender, approve.value, deadline, '0x99', r, s), 'ERC20: approve from the zero address')
   })
 
   it('permit(): fails with expired deadline', async () => {

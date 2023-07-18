@@ -9,6 +9,8 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
   const [owner, alice, bob] = accounts;
 
   const [bountyAddress, lpRewardsAddress, multisig] = accounts.slice(997, 1000)
+
+  const dec = th.dec;
   
   let contracts
   let usdsToken
@@ -22,6 +24,7 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
 
   let sableStaking
   let communityIssuance
+  let sableRewarder
   let sableToken 
 
   before(async () => {
@@ -42,6 +45,7 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
 
     sableStaking = SABLEContracts.sableStaking
     communityIssuance = SABLEContracts.communityIssuance
+    sableRewarder = SABLEContracts.sableRewarder
     sableToken = SABLEContracts.sableToken
   })
 
@@ -89,6 +93,27 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
     const txOwner = await contract.setAddresses(...params, { from: owner })
     assert.isTrue(txOwner.receipt.status)
     // fails if called twice
+    await th.assertRevert(contract.setAddresses(...params, { from: owner }))
+  }
+
+  const testSableStakingSetAddresses = async (contract, numberOfAddresses) => {
+    const dumbContract = await GasPool.new()
+    const params = Array(numberOfAddresses).fill(dumbContract.address)
+
+    // Attempt call from alice
+    await th.assertRevert(contract.setAddresses(...params, { from: alice }))
+
+    // Attempt to use zero address
+    await testZeroAddress(contract, params)
+    // Attempt to use non contract
+    await testNonContractAddress(contract, params)
+
+    // Owner can successfully set any address
+    const txOwner = await contract.setAddresses(...params, { from: owner })
+    console.log(txOwner.receipt.status)
+    assert.isTrue(txOwner.receipt.status)
+    // fails if called twice
+    await contract.renounceOwnership({ from: owner })
     await th.assertRevert(contract.setAddresses(...params, { from: owner }))
   }
 
@@ -306,9 +331,42 @@ contract('All Liquity functions with onlyOwner modifier', async accounts => {
     })
   })
 
-  describe('SABLEStaking', async accounts => {
+  describe('CommunityIssuance', async accounts => {
+    it("updateRewardPerSec(): reverts when called by non-owner", async () => {
+      // attempt to call update as non-owner
+      await th.assertRevert(communityIssuance.updateRewardPerSec(dec(1, 18), { from: alice}))
+    })
+  })
+
+  describe('SableRewarder', async accounts => {
     it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
-      await testSetAddresses(sableStaking, 5)
+      const params = [sableToken.address, sableStaking.address, th.dec(1, 18)]
+      await th.assertRevert(sableRewarder.setParams(...params, { from: alice }))
+
+      // Attempt to use zero address
+      await testZeroParam(sableRewarder, params)
+      // Attempt to use non contract
+      await testNonContractParam(sableRewarder, params)
+
+      // Owner can successfully set any address
+      const txOwner = await sableRewarder.setParams(...params, { from: owner })
+
+      assert.isTrue(txOwner.receipt.status)
+      // fails if called twice
+      await th.assertRevert(sableRewarder.setParams(...params, { from: owner }))
+    })
+  })
+
+  describe('SableRewarder', async accounts => {
+    it("updateRewardPerSec(): reverts when called by non-owner", async () => {
+      // attempt to call update as non-owner
+      await th.assertRevert(sableRewarder.updateRewardPerSec(dec(1, 18), { from: alice}))
+    })
+  })
+
+  describe('SableStakingV2', async accounts => {
+    it("setAddresses(): reverts when called by non-owner, with wrong addresses, or twice", async () => {
+      await testSableStakingSetAddresses(sableStaking, 6)
     })
   })
 

@@ -42,16 +42,12 @@ contract("TimeLock-SystemState", async accounts => {
   beforeEach(async () => {
     contracts = await deploymentHelper.deployLiquityCore();
     const MINT_AMOUNT = toBN(dec(100000000, 18));
-    const SABLEContracts = await deploymentHelper.deploySABLEContracts(
-      bountyAddress,
-      MINT_AMOUNT
-    );
+    const SABLEContracts = await deploymentHelper.deploySABLEContracts(bountyAddress, MINT_AMOUNT);
     systemState = contracts.systemState;
     timeLock = contracts.timeLock;
     stabilityPool = contracts.stabilityPool;
     communityIssuance = SABLEContracts.communityIssuance;
 
-    ;
     await deploymentHelper.connectCoreContracts(contracts, SABLEContracts);
     await deploymentHelper.connectSABLEContractsToCore(SABLEContracts, contracts);
     minDelay = await timeLock.getMinDelay();
@@ -118,7 +114,10 @@ contract("TimeLock-SystemState", async accounts => {
     });
     expect(await timeLock.isOperation(id)).to.be.eq(true);
     await time.increase(Number(executeTime) + 1);
-    await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner, value : 1000 });
+    await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, {
+      from: owner,
+      value: 1000
+    });
     expect(await systemState.getUSDSGasCompensation()).to.be.bignumber.equal((1000).toString());
   });
 
@@ -137,7 +136,7 @@ contract("TimeLock-SystemState", async accounts => {
     expect(await timeLock.isOperation(id)).to.be.eq(true);
     await time.increase(Number(executeTime) + 1);
     await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner });
-    expect(await systemState.getMCR()).to.be.bignumber.equal((value).toString());
+    expect(await systemState.getMCR()).to.be.bignumber.equal(value.toString());
   });
 
   it("Timelock - should execute queue success - setCCR", async () => {
@@ -155,7 +154,7 @@ contract("TimeLock-SystemState", async accounts => {
     expect(await timeLock.isOperation(id)).to.be.eq(true);
     await time.increase(Number(executeTime) + 1);
     await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner });
-    expect(await systemState.getCCR()).to.be.bignumber.equal((value).toString());
+    expect(await systemState.getCCR()).to.be.bignumber.equal(value.toString());
   });
 
   it("Timelock - should execute queue success - setBorrowingFeeFloor", async () => {
@@ -224,7 +223,7 @@ contract("TimeLock-SystemState", async accounts => {
     await time.increase(Number(executeTime) - 10);
     await assertRevert(
       timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner }),
-      "Timestamp not passed"
+      "TimelockController: operation is not ready"
     );
   });
 
@@ -243,7 +242,7 @@ contract("TimeLock-SystemState", async accounts => {
     expect(await timeLock.isOperation(id)).to.be.eq(true);
     await time.increase(Number(executeTime) + 1);
     await timeLock.execute(systemState.address, 0, newValue, zeroBytes, zeroBytes, { from: owner });
-    expect(await systemState.getMCR()).to.be.bignumber.equal((value).toString());
+    expect(await systemState.getMCR()).to.be.bignumber.equal(value.toString());
   });
 
   it("Timelock - should not set new MCR <= 100%", async () => {
@@ -285,5 +284,4 @@ contract("TimeLock-SystemState", async accounts => {
       "TimelockController: underlying transaction reverted"
     );
   });
-
 });

@@ -80,6 +80,10 @@ class TestHelper {
 
     return Number(x_BN.sub(y_BN).abs());
   }
+  
+  static getDifferenceBN(x, y) {
+    return Number(x.sub(y).abs());
+  }
 
   static assertIsApproximatelyEqual(x, y, error = 1000) {
     assert.isAtMost(this.getDifference(x, y), error);
@@ -1483,11 +1487,22 @@ class TestHelper {
     } catch (err) {
       // console.log("tx failed")
       assert.include(err.message, "revert");
-      // TODO !!!
+      // TODO: ensure this function runs properly on other test scripts
 
-      // if (message) {
-      //   assert.include(err.message, message)
-      // }
+      if (message) {
+        assert.include(err.message, message)
+      }
+    }
+  }
+
+  static async assertAssertRevert(txPromise, message = undefined) {
+    try {
+      const tx = await txPromise;
+      assert.isFalse(tx.receipt.status); // when this assert fails, the expected revert didn't occur, i.e. the tx succeeded
+    } catch (err) {
+      if (message) {
+        assert.include(err.message, message)
+      }
     }
   }
 
